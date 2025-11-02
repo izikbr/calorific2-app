@@ -1,7 +1,6 @@
-import React, { useState, useMemo } from 'react';
-// FIX: Implement the main App component, managing state, user profiles, and UI flow.
+import React, { useState, useMemo, useEffect } from 'react';
 import { GoogleGenAI } from '@google/genai';
-import { UserProfile, FoodItem, Gender, ActivityLevel, Goal } from './types';
+import { UserProfile, FoodItem, ModalType, WeightEntry } from './types';
 import useLocalStorage from './hooks/useLocalStorage';
 
 import Header from './components/Header';
@@ -11,11 +10,9 @@ import Onboarding from './components/Onboarding';
 import Dashboard from './components/Dashboard';
 import ManualLogModal from './components/ManualLogModal';
 import ImageLogModal from './components/ImageLogModal';
-import UpdateGoalModal from './components/UpdateGoalModal';
 import UpdateProfileModal from './components/UpdateProfileModal';
 import UpdateTimelineModal from './components/UpdateTimelineModal';
-import AppleHealthInfoModal from './components/AppleHealthInfoModal';
-import { ACTIVITY_FACTORS, GOAL_ADJUSTMENTS } from './constants';
+import QuickAddModal from './components/QuickAddModal';
 
 // Simple ID generator to avoid external dependencies
 const simpleId = () => `id_${Math.random().toString(36).substring(2, 11)}_${Date.now()}`;
@@ -26,54 +23,31 @@ const App: React.FC = () => {
     const [activeProfileId, setActiveProfileId] = useLocalStorage<string | null>('calorific-active-profile-id', null);
     
     // Food logs are stored per profile ID, keyed by date string YYYY-MM-DD
-    const [foodLogs, setFoodLogs] = useLocalStorage<Record<string, Record<string, FoodItem[]>>>('calorific-food-logs-v2', {});
+    const [foodLogs, setFoodLogs] = useLocalStorage<Record<string, Record<string, FoodItem[]>>>('calorific-food-logs-v3', {});
 
     const [isOnboarding, setIsOnboarding] = useState(false);
     
-    // Modal states
-    const [isManualLogOpen, setManualLogOpen] = useState(false);
-    const [isImageLogOpen, setImageLogOpen] = useState(false);
-    const [isUpdateGoalOpen, setUpdateGoalOpen] = useState(false);
-    const [isUpdateProfileOpen, setUpdateProfileOpen] = useState(false);
-    const [isAppleHealthInfoOpen, setAppleHealthInfoOpen] = useState(false);
-    const [timelineItemToUpdate, setTimelineItemToUpdate] = useState<FoodItem | null>(null);
+    // Centralized modal state
+    const [activeModal, setActiveModal] = useState<ModalType | null>(null);
+    const [itemToEdit, setItemToEdit] = useState<FoodItem | null>(null);
+
+    // Date state for history view
+    const [selectedDate, setSelectedDate] = useState(new Date());
 
     // Gemini AI Instance
     const ai = useMemo(() => {
-        // FIX: Initialize GoogleGenAI client according to coding guidelines.
         return new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
     }, []);
 
     // Derived State
     const activeProfile = profiles.find(p => p.id === activeProfileId) || null;
-    const todayKey = new Date().toISOString().split('T')[0];
-    const activeFoodLog = activeProfile ? (foodLogs[activeProfile.id]?.[todayKey] || []) : [];
 
+    const selectedDateKey = selectedDate.toLocaleDateString('en-CA'); // YYYY-MM-DD format
 
-    const dailyCalorieGoal = useMemo(() => {
-        if (!activeProfile) return 2000;
-        const { gender, weight, height, age, activityLevel, goal, loseWeightWeeks, targetWeight } = activeProfile;
-        
-        // Harris-Benedict BMR Calculation
-        let bmr;
-        if (gender === Gender.Male) {
-            bmr = 88.362 + (13.397 * weight) + (4.799 * height) - (5.677 * age);
-        } else {
-            bmr = 447.593 + (9.247 * weight) + (3.098 * height) - (4.330 * age);
-        }
-
-        const tdee = bmr * (ACTIVITY_FACTORS[activityLevel] || 1.55);
-
-        if (goal === Goal.Lose && loseWeightWeeks && targetWeight && loseWeightWeeks > 0) {
-            const weightToLose = weight - targetWeight;
-            if (weightToLose > 0) {
-                const weeklyDeficit = (weightToLose * 7700) / loseWeightWeeks;
-                return Math.max(1200, tdee - (weeklyDeficit / 7)); // Ensure goal is not dangerously low
-            }
-        }
-        
-        return tdee + (GOAL_ADJUSTMENTS[goal] || 0);
-    }, [activeProfile]);
+    const activeFoodLog = useMemo(() => {
+        if (!activeProfile) return [];
+        return foodLogs[activeProfile.id]?.[selectedDateKey] || [];
+    }, [activeProfile, foodLogs, selectedDateKey]);
 
 
     // Handlers
@@ -93,7 +67,7 @@ const App: React.FC = () => {
     };
 
     const handleOnboardingComplete = (profileData: Omit<UserProfile, 'id'>) => {
-        const newProfile: UserProfile = { ...profileData, id: simpleId() };
+        const newProfile: UserProfile = { ...profileData, id: simpleId(), weightLog: [{ date: new Date().toLocaleDateString('en-CA'), weight: profileData.weight }] };
         const newProfiles = [...profiles, newProfile];
         setProfiles(newProfiles);
         setActiveProfileId(newProfile.id);
@@ -119,6 +93,8 @@ const App: React.FC = () => {
     
     const handleLogFoodItems = (items: Omit<FoodItem, 'id' | 'timestamp'>[]) => {
         if (!activeProfileId) return;
+        
+        const dateKey = new Date().toLocaleDateString('en-CA');
 
         const newItems: FoodItem[] = items.map(item => ({
             ...item,
@@ -127,46 +103,78 @@ const App: React.FC = () => {
         }));
 
         const profileLogs = foodLogs[activeProfileId] || {};
-        const todayLog = profileLogs[todayKey] || [];
+        const currentLog = profileLogs[dateKey] || [];
         
-        const updatedTodayLog = [...todayLog, ...newItems].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        const updatedLog = [...currentLog, ...newItems].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
         
         setFoodLogs({ 
             ...foodLogs, 
             [activeProfileId]: {
                 ...profileLogs,
-                [todayKey]: updatedTodayLog
+                [dateKey]: updatedLog
             } 
         });
     };
     
     const handleUpdateTimelineItem = (updatedItem: FoodItem) => {
         if (!activeProfileId) return;
-        const updatedLog = activeFoodLog.map(item => item.id === updatedItem.id ? updatedItem : item);
-        
+        const dateKey = new Date(updatedItem.timestamp).toLocaleDateString('en-CA');
         const profileLogs = foodLogs[activeProfileId] || {};
+        const logForDate = profileLogs[dateKey] || [];
+        
+        const updatedLog = logForDate.map(item => item.id === updatedItem.id ? updatedItem : item);
+        
         setFoodLogs({ 
             ...foodLogs, 
             [activeProfileId]: {
                 ...profileLogs,
-                [todayKey]: updatedLog
+                [dateKey]: updatedLog
             } 
         });
-        setTimelineItemToUpdate(null);
+        setActiveModal(null);
+        setItemToEdit(null);
     };
 
     const handleDeleteTimelineItem = (itemId: string) => {
         if (!activeProfileId) return;
-        const updatedLog = activeFoodLog.filter(item => item.id !== itemId);
-         const profileLogs = foodLogs[activeProfileId] || {};
+        const dateKey = new Date(itemToEdit!.timestamp).toLocaleDateString('en-CA');
+        const profileLogs = foodLogs[activeProfileId] || {};
+        const logForDate = profileLogs[dateKey] || [];
+
+        const updatedLog = logForDate.filter(item => item.id !== itemId);
         setFoodLogs({ 
             ...foodLogs, 
             [activeProfileId]: {
                 ...profileLogs,
-                [todayKey]: updatedLog
+                [dateKey]: updatedLog
             } 
         });
+        setActiveModal(null);
+        setItemToEdit(null);
     };
+
+    const handleAddWeight = (weight: number) => {
+        if (!activeProfile) return;
+        const todayStr = new Date().toLocaleDateString('en-CA');
+        
+        const newEntry: WeightEntry = { date: todayStr, weight };
+        
+        const updatedLog = activeProfile.weightLog ? [...activeProfile.weightLog.filter(e => e.date !== todayStr), newEntry] : [newEntry];
+        updatedLog.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+        handleUpdateProfile({ weight, weightLog: updatedLog });
+    };
+
+    const handleUpdateGoalTimeline = (weeks: number) => {
+        if (!activeProfile) return;
+        handleUpdateProfile({ loseWeightWeeks: weeks });
+        setActiveModal(null);
+    };
+
+    const openEditModal = (item: FoodItem) => {
+        setItemToEdit(item);
+        setActiveModal('updateTimeline');
+    }
 
     // Render Logic
     const renderContent = () => {
@@ -174,13 +182,11 @@ const App: React.FC = () => {
             return <Dashboard 
                 userProfile={activeProfile}
                 foodLog={activeFoodLog}
-                dailyCalorieGoal={dailyCalorieGoal}
-                onOpenManualLog={() => setManualLogOpen(true)}
-                onOpenImageLog={() => setImageLogOpen(true)}
-                onOpenUpdateGoal={() => setUpdateGoalOpen(true)}
-                onOpenUpdateProfile={() => setUpdateProfileOpen(true)}
-                onOpenUpdateTimeline={setTimelineItemToUpdate}
-                onOpenAppleHealthInfo={() => setAppleHealthInfoOpen(true)}
+                selectedDate={selectedDate}
+                setSelectedDate={setSelectedDate}
+                setActiveModal={setActiveModal}
+                onEditItem={openEditModal}
+                onAddWeight={handleAddWeight}
             />;
         }
         if (isOnboarding) {
@@ -197,53 +203,60 @@ const App: React.FC = () => {
     return (
         <div className="flex flex-col min-h-screen bg-slate-50 font-sans" dir="rtl">
             <Header userProfile={activeProfile} onLogout={handleLogout} />
-            <main className="flex-grow container mx-auto p-4 max-w-4xl">
+            <main className="flex-grow container mx-auto p-4 max-w-5xl">
                 {renderContent()}
             </main>
             <Footer />
             
             {/* Modals */}
             <ManualLogModal 
-                isOpen={isManualLogOpen}
-                onClose={() => setManualLogOpen(false)}
+                isOpen={activeModal === 'manualLog'}
+                onClose={() => setActiveModal(null)}
                 onLog={handleLogFoodItems}
                 ai={ai}
             />
             <ImageLogModal
-                isOpen={isImageLogOpen}
-                onClose={() => setImageLogOpen(false)}
+                isOpen={activeModal === 'imageLog'}
+                onClose={() => setActiveModal(null)}
                 onLog={handleLogFoodItems}
                 ai={ai}
             />
+            <QuickAddModal
+                isOpen={activeModal === 'quickAdd'}
+                onClose={() => setActiveModal(null)}
+                onLog={handleLogFoodItems}
+            />
             {activeProfile && (
                 <>
-                    <UpdateGoalModal
-                        isOpen={isUpdateGoalOpen}
-                        onClose={() => setUpdateGoalOpen(false)}
-                        onUpdate={handleUpdateProfile}
-                        userProfile={activeProfile}
-                    />
                     <UpdateProfileModal
-                        isOpen={isUpdateProfileOpen}
-                        onClose={() => setUpdateProfileOpen(false)}
-                        onUpdate={handleUpdateProfile}
+                         isOpen={activeModal === 'updateProfile'}
+                         onClose={() => setActiveModal(null)}
+                         onUpdate={handleUpdateProfile}
+                         userProfile={activeProfile}
+                    />
+                    <UpdateTimelineModal
+                        isOpen={activeModal === 'updateTimeline' && !!itemToEdit}
+                        onClose={() => {
+                            setActiveModal(null)
+                            setItemToEdit(null)
+                        }}
+                        onUpdate={handleUpdateGoalTimeline}
                         userProfile={activeProfile}
                     />
                 </>
             )}
-             {timelineItemToUpdate && (
+             {itemToEdit && (
                 <UpdateTimelineModal
-                    isOpen={!!timelineItemToUpdate}
-                    onClose={() => setTimelineItemToUpdate(null)}
+                    isOpen={activeModal === 'updateTimeline'}
+                    onClose={() => {
+                        setActiveModal(null);
+                        setItemToEdit(null);
+                    }}
                     onUpdate={handleUpdateTimelineItem}
                     onDelete={handleDeleteTimelineItem}
-                    foodItem={timelineItemToUpdate}
+                    foodItem={itemToEdit}
                 />
             )}
-            <AppleHealthInfoModal 
-                isOpen={isAppleHealthInfoOpen}
-                onClose={() => setAppleHealthInfoOpen(false)}
-            />
         </div>
     );
 }

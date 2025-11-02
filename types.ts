@@ -1,4 +1,3 @@
-// FIX: Define and export all application-specific types to resolve module errors.
 export enum Gender {
   Male = 'male',
   Female = 'female',
@@ -16,6 +15,12 @@ export enum Goal {
   Gain = 'gain',
 }
 
+export interface WeightEntry {
+  date: string; // YYYY-MM-DD
+  weight: number;
+}
+
+
 export interface UserProfile {
   id: string;
   name: string;
@@ -28,6 +33,7 @@ export interface UserProfile {
   activityLevel: ActivityLevel;
   goal: Goal;
   loseWeightWeeks?: number;
+  weightLog?: WeightEntry[];
 }
 
 export interface FoodItem {
@@ -39,3 +45,5 @@ export interface FoodItem {
   fat: number;
   timestamp: string;
 }
+
+export type ModalType = 'manualLog' | 'imageLog' | 'updateProfile' | 'updateTimeline' | 'quickAdd';
