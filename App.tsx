@@ -17,7 +17,6 @@ import AppleHealthInfoModal from './components/AppleHealthInfoModal';
 dayjs.extend(relativeTime);
 dayjs.locale('he');
 
-// FIX: Implemented the main App component to manage state and application flow, resolving previous errors about missing content.
 function App() {
   const [profiles, setProfiles] = useLocalStorage<UserProfile[]>('caloric-profiles', []);
   const [activeProfileId, setActiveProfileId] = useLocalStorage<string | null>('caloric-active-profile', null);
@@ -25,6 +24,7 @@ function App() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [modal, setModal] = useState<ModalType>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(new Date());
   
   const ai = useMemo(() => {
     if (!process.env.API_KEY) {
@@ -36,12 +36,16 @@ function App() {
 
   const activeProfile = useMemo(() => profiles.find(p => p.id === activeProfileId), [profiles, activeProfileId]);
   
-  const todayFoodLog = useMemo(() => {
+  const currentFoodLog = useMemo(() => {
     if (!activeProfileId) return [];
     const userLog = foodLogs[activeProfileId] || [];
-    const today = dayjs().startOf('day');
-    return userLog.filter(item => dayjs(item.timestamp).isAfter(today));
-  }, [foodLogs, activeProfileId]);
+    const startOfDay = dayjs(selectedDate).startOf('day');
+    const endOfDay = dayjs(selectedDate).endOf('day');
+    return userLog.filter(item => {
+        const itemDate = dayjs(item.timestamp);
+        return itemDate.isAfter(startOfDay) && itemDate.isBefore(endOfDay);
+    });
+  }, [foodLogs, activeProfileId, selectedDate]);
 
   const handleSelectProfile = (id: string) => {
     setActiveProfileId(id);
@@ -104,10 +108,12 @@ function App() {
       return (
         <Dashboard
           userProfile={activeProfile}
-          foodLog={todayFoodLog}
+          foodLog={currentFoodLog}
           onAddFood={handleAddFood}
           onRemoveFood={handleRemoveFood}
           setModal={setModal}
+          selectedDate={selectedDate}
+          setSelectedDate={setSelectedDate}
         />
       );
     }
