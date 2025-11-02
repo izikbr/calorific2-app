@@ -1,53 +1,43 @@
+// FIX: Import React to make its namespace available for type definitions like React.Dispatch.
 import React, { useState, useEffect } from 'react';
 
-function useLocalStorage<T,>(key: string, initialValue: T): [T, React.Dispatch<React.SetStateAction<T>>] {
-  // State to store our value
-  // Pass initial state function to useState so logic is only executed once
+/**
+ * A stable and simple hook to persist state to localStorage.
+ * It reads the value from localStorage on initial render and saves it back
+ * whenever the state value changes.
+ * It does NOT react to key changes after initialization; that logic is now handled
+ * in the App component for clarity and safety.
+ * @param key The localStorage key. If null, the hook will not interact with localStorage.
+ * @param initialValue The initial value to use if nothing is in localStorage.
+ * @returns A stateful value, and a function to update it.
+ */
+function useLocalStorage<T>(
+  key: string | null,
+  initialValue: T
+): [T, React.Dispatch<React.SetStateAction<T>>] {
+  
   const [storedValue, setStoredValue] = useState<T>(() => {
-    if (!key || typeof window === 'undefined') {
+    if (typeof window === 'undefined' || !key) {
       return initialValue;
     }
     try {
-      // Get from local storage by key
       const item = window.localStorage.getItem(key);
-      // Parse stored json or if none return initialValue
       return item ? JSON.parse(item) : initialValue;
     } catch (error) {
-      // If error also return initialValue
-      console.log(error);
+      console.error(error);
       return initialValue;
     }
   });
 
-  // useEffect to update local storage when the key or storedValue changes
   useEffect(() => {
-     if (!key || typeof window === 'undefined') {
-      return;
-    }
-    try {
-      // Save state to local storage
-      window.localStorage.setItem(key, JSON.stringify(storedValue));
-    } catch (error) {
-      // A more advanced implementation would handle the error case
-      console.log(error);
+    if (typeof window !== 'undefined' && key) {
+        try {
+            window.localStorage.setItem(key, JSON.stringify(storedValue));
+        } catch (error) {
+            console.error(`Could not save value for key: ${key}`, error);
+        }
     }
   }, [key, storedValue]);
-  
-  // This effect re-reads from localStorage if the key changes.
-  // This is crucial for the food log, which has a dynamic key based on the user and date.
-  useEffect(() => {
-    if (!key) {
-        setStoredValue(initialValue);
-        return;
-    };
-    try {
-      const item = window.localStorage.getItem(key);
-      setStoredValue(item ? JSON.parse(item) : initialValue);
-    } catch (error) {
-      console.log(error);
-      setStoredValue(initialValue);
-    }
-  }, [key]);
 
   return [storedValue, setStoredValue];
 }

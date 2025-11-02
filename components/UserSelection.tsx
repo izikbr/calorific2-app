@@ -3,34 +3,50 @@ import { UserProfile } from '../types';
 import Card from './common/Card';
 
 interface UserSelectionProps {
-  users: UserProfile[];
-  onSelectUser: (user: UserProfile) => void;
-  onAddNewUser: () => void;
+  profiles: UserProfile[];
+  onSelectProfile: (id: string) => void;
+  onDeleteProfile: (id: string) => void;
+  onNewProfile: () => void;
 }
 
-const UserSelection: React.FC<UserSelectionProps> = ({ users, onSelectUser, onAddNewUser }) => {
+// FIX: Implemented the UserSelection component to allow choosing or creating a profile.
+const UserSelection: React.FC<UserSelectionProps> = ({ profiles, onSelectProfile, onDeleteProfile, onNewProfile }) => {
   return (
     <Card>
-      <div className="p-8 text-center">
-        <h1 className="text-2xl font-bold text-slate-800 mb-2">ברוכים השבים ל-קלוריק!</h1>
-        <p className="text-slate-500 mb-8">מי משתמש באפליקציה היום?</p>
+      <div className="p-6 text-center">
+        <h2 className="text-2xl font-bold text-slate-800 mb-2">בחירת פרופיל</h2>
+        <p className="text-slate-500 mb-8">
+          {profiles.length > 0 ? 'בחר פרופיל קיים או צור פרופיל חדש.' : 'לא נמצאו פרופילים. צור פרופיל חדש כדי להתחיל.'}
+        </p>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mb-8">
-          {users.map(user => (
-            <div key={user.id} onClick={() => onSelectUser(user)} className="cursor-pointer group flex flex-col items-center p-4 border border-transparent rounded-lg hover:bg-primary-50 hover:border-primary-200 transition">
-                <div className="w-20 h-20 rounded-full bg-slate-200 flex items-center justify-center mb-3 group-hover:bg-primary-200 transition">
-                     <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-user text-slate-500 group-hover:text-primary-600 transition"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        {profiles.length > 0 && (
+          <ul className="space-y-3 text-start mb-6">
+            {profiles.map(profile => (
+              <li key={profile.id} className="group flex items-center justify-between p-4 bg-slate-100 rounded-lg hover:bg-primary-100 transition-colors cursor-pointer" onClick={() => onSelectProfile(profile.id)}>
+                <div className="flex-grow">
+                  <span className="font-semibold text-lg text-slate-700 group-hover:text-primary-700">{profile.name}</span>
                 </div>
-              <span className="font-semibold text-slate-700 group-hover:text-primary-700 transition">{user.name}</span>
-            </div>
-          ))}
-           <div onClick={onAddNewUser} className="cursor-pointer group flex flex-col items-center justify-center p-4 border-2 border-dashed border-slate-300 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition">
-                 <div className="w-20 h-20 rounded-full bg-slate-100 flex items-center justify-center mb-3 group-hover:bg-primary-100 transition">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-plus text-slate-400 group-hover:text-primary-500 transition"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
-                 </div>
-                 <span className="font-semibold text-slate-500 group-hover:text-primary-600 transition">משתמש חדש</span>
-            </div>
-        </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDeleteProfile(profile.id);
+                  }}
+                  className="text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-2 -mr-2"
+                  title="מחק פרופיל"
+                >
+                   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        
+        <button
+          onClick={onNewProfile}
+          className="w-full p-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition font-semibold text-lg"
+        >
+          {profiles.length > 0 ? 'צור פרופיל חדש' : 'צור פרופיל ראשון'}
+        </button>
       </div>
     </Card>
   );
