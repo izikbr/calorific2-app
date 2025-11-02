@@ -1,4 +1,4 @@
-// FIX: Implemented the core TypeScript types and enums.
+// FIX: Define and export all application-specific types to resolve module errors.
 export enum Gender {
   Male = 'male',
   Female = 'female',
@@ -16,6 +16,20 @@ export enum Goal {
   Gain = 'gain',
 }
 
+export interface UserProfile {
+  id: string;
+  name: string;
+  avatar?: string;
+  gender: Gender;
+  age: number;
+  height: number;
+  weight: number;
+  targetWeight: number;
+  activityLevel: ActivityLevel;
+  goal: Goal;
+  loseWeightWeeks?: number;
+}
+
 export interface FoodItem {
   id: string;
   name: string;
@@ -23,20 +37,5 @@ export interface FoodItem {
   protein: number;
   carbs: number;
   fat: number;
-  timestamp: string; // ISO string
-}
-
-export interface UserProfile {
-  id: string;
-  name: string;
-  avatar?: string;
-  age: number;
-  gender: Gender;
-  height: number; // in cm
-  weight: number; // in kg
-  targetWeight: number; // in kg
-  activityLevel: ActivityLevel;
-  goal: Goal;
-  loseWeightWeeks?: number;
-  foodLog?: FoodItem[];
+  timestamp: string;
 }

@@ -1,248 +1,196 @@
-import React, { useState, useMemo } from 'react';
-import { GoogleGenAI } from '@google/genai';
-import { UserProfile, FoodItem, Gender, ActivityLevel, Goal } from '../types';
-import { ACTIVITY_FACTORS, GOAL_ADJUSTMENTS } from '../constants';
+import React from 'react';
+// FIX: Implement the Dashboard component to display user data and daily progress.
+import { UserProfile, FoodItem } from '../types';
 import Card from './common/Card';
-import ManualLogModal from './ManualLogModal';
-import ImageLogModal from './ImageLogModal';
-import UpdateGoalModal from './UpdateGoalModal';
-import UpdateProfileModal from './UpdateProfileModal';
-import UpdateTimelineModal from './UpdateTimelineModal';
-import AppleHealthInfoModal from './AppleHealthInfoModal';
 
 interface DashboardProps {
   userProfile: UserProfile;
-  onUpdateProfile: (updatedProfile: Partial<UserProfile>) => void;
-  onAddFood: (foodItems: FoodItem[]) => void;
-  onUpdateFood: (foodItem: FoodItem) => void;
-  onDeleteFood: (foodItemId: string) => void;
-  ai: GoogleGenAI;
+  foodLog: FoodItem[];
+  dailyCalorieGoal: number;
+  onOpenManualLog: () => void;
+  onOpenImageLog: () => void;
+  onOpenUpdateGoal: () => void;
+  onOpenUpdateProfile: () => void;
+  onOpenUpdateTimeline: (item: FoodItem) => void;
+  onOpenAppleHealthInfo: () => void;
 }
 
-// FIX: Implemented the main Dashboard component and its functionality.
+const StatCard: React.FC<{ label: string; value: number | string; unit?: string; className?: string }> = ({ label, value, unit, className = '' }) => (
+    <div className={`text-center ${className}`}>
+        <p className="text-2xl font-bold text-slate-800">{value}</p>
+        <p className="text-sm text-slate-500">{label}{unit && ` (${unit})`}</p>
+    </div>
+);
 
-// Helper to calculate BMR using Mifflin-St Jeor equation
-const calculateBMR = (profile: UserProfile): number => {
-    const { weight, height, age, gender } = profile;
-    if (gender === Gender.Male) {
-        return 10 * weight + 6.25 * height - 5 * age + 5;
-    }
-    return 10 * weight + 6.25 * height - 5 * age - 161;
-};
-
-// Helper to calculate daily calorie target
-const calculateDailyCalories = (profile: UserProfile): number => {
-    const bmr = calculateBMR(profile);
-    const tdee = bmr * ACTIVITY_FACTORS[profile.activityLevel as ActivityLevel];
-    const goalAdjustment = GOAL_ADJUSTMENTS[profile.goal as Goal];
-    
-    if(profile.goal === Goal.Lose && profile.targetWeight && profile.weight > profile.targetWeight && profile.loseWeightWeeks && profile.loseWeightWeeks > 0) {
-      const weightToLose = profile.weight - profile.targetWeight;
-      const weeklyDeficit = (weightToLose * 7700) / profile.loseWeightWeeks;
-      const dailyDeficit = weeklyDeficit / 7;
-      return Math.round(tdee - dailyDeficit);
-    }
-
-    return Math.round(tdee + goalAdjustment);
-};
-
-// Helper to calculate macro targets (e.g., 40% carbs, 30% protein, 30% fat)
-const calculateMacros = (calories: number) => {
-    return {
-        protein: Math.round((calories * 0.30) / 4), // 4 calories per gram
-        carbs: Math.round((calories * 0.40) / 4),
-        fat: Math.round((calories * 0.30) / 9), // 9 calories per gram
-    };
-};
-
-const Dashboard: React.FC<DashboardProps> = ({ userProfile, onUpdateProfile, onAddFood, onUpdateFood, onDeleteFood, ai }) => {
-    const [isManualLogOpen, setManualLogOpen] = useState(false);
-    const [isImageLogOpen, setImageLogOpen] = useState(false);
-    const [isUpdateGoalOpen, setUpdateGoalOpen] = useState(false);
-    const [isUpdateProfileOpen, setUpdateProfileOpen] = useState(false);
-    const [isAppleHealthInfoOpen, setAppleHealthInfoOpen] = useState(false);
-    const [editingFoodItem, setEditingFoodItem] = useState<FoodItem | null>(null);
-
-    const dailyCalorieTarget = useMemo(() => calculateDailyCalories(userProfile), [userProfile]);
-    const macroTargets = useMemo(() => calculateMacros(dailyCalorieTarget), [dailyCalorieTarget]);
-
-    const today = new Date().toISOString().split('T')[0];
-    const todaysLog = useMemo(() => (userProfile.foodLog || []).filter(item => item.timestamp.startsWith(today)), [userProfile.foodLog]);
-
-    const totals = useMemo(() => {
-        return todaysLog.reduce((acc, item) => ({
-            calories: acc.calories + item.calories,
-            protein: acc.protein + item.protein,
-            carbs: acc.carbs + item.carbs,
-            fat: acc.fat + item.fat,
-        }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
-    }, [todaysLog]);
-
-    const handleAddFoodWithId = (foodItems: Omit<FoodItem, 'id'>[]) => {
-      const itemsWithId = foodItems.map(item => ({...item, id: `${new Date().toISOString()}-${Math.random()}`}));
-      onAddFood(itemsWithId);
-    }
-    
-    const handleUpdateFoodWithId = (foodItem: FoodItem) => {
-        onUpdateFood(foodItem);
-        setEditingFoodItem(null);
-    }
-
-    const ProgressCircle: React.FC<{ value: number; total: number; label: string; unit: string; color: string }> = ({ value, total, label, unit, color }) => {
-        const percentage = total > 0 ? Math.min((value / total) * 100, 100) : 0;
-        const circumference = 2 * Math.PI * 45;
-        const offset = circumference - (percentage / 100) * circumference;
-
-        return (
-            <div className="flex flex-col items-center text-center">
-                <div className="relative w-28 h-28">
-                    <svg className="w-full h-full" viewBox="0 0 100 100">
-                        <circle className="text-slate-200" strokeWidth="10" stroke="currentColor" fill="transparent" r="45" cx="50" cy="50" />
-                        <circle
-                            className={color}
-                            strokeWidth="10"
-                            strokeDasharray={circumference}
-                            strokeDashoffset={offset}
-                            strokeLinecap="round"
-                            stroke="currentColor"
-                            fill="transparent"
-                            r="45"
-                            cx="50"
-                            cy="50"
-                            style={{ transition: 'stroke-dashoffset 0.5s ease-out' }}
-                            transform="rotate(-90 50 50)"
-                        />
-                    </svg>
-                    <div className="absolute inset-0 flex flex-col items-center justify-center">
-                        <span className="text-xl font-bold text-slate-800">{Math.round(value)}</span>
-                        <span className="text-xs text-slate-500">/ {Math.round(total)}{unit}</span>
-                    </div>
-                </div>
-                <span className="mt-2 font-semibold text-slate-600">{label}</span>
-            </div>
-        );
-    };
-
+const MacroProgressBar: React.FC<{ label: string; value: number; goal: number; color: string }> = ({ label, value, goal, color }) => {
+    const percentage = goal > 0 ? Math.min((value / goal) * 100, 100) : 0;
     return (
-        <div className="space-y-6">
-            <Card>
-                <div className="p-6">
-                    <div className="flex justify-between items-start">
-                        <div>
-                            <h2 className="text-2xl font-bold text-slate-800">סיכום יומי</h2>
-                            <p className="text-slate-500">התקדמות הצריכה שלך להיום</p>
-                        </div>
-                        <div className="flex gap-2">
-                             <button onClick={() => setUpdateProfileOpen(true)} className="p-2 text-slate-500 hover:text-primary-600 hover:bg-slate-100 rounded-full transition" title="ערוך פרופיל">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
-                            </button>
-                            <button onClick={() => setUpdateGoalOpen(true)} className="p-2 text-slate-500 hover:text-primary-600 hover:bg-slate-100 rounded-full transition" title="עדכן יעדים">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/></svg>
-                            </button>
-                        </div>
-                    </div>
-                    <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4 justify-items-center">
-                        <ProgressCircle value={totals.calories} total={dailyCalorieTarget} label="קלוריות" unit="" color="text-primary-500" />
-                        <ProgressCircle value={totals.protein} total={macroTargets.protein} label="חלבון" unit="ג'" color="text-red-500" />
-                        <ProgressCircle value={totals.carbs} total={macroTargets.carbs} label="פחמימות" unit="ג'" color="text-yellow-500" />
-                        <ProgressCircle value={totals.fat} total={macroTargets.fat} label="שומן" unit="ג'" color="text-blue-500" />
-                    </div>
-                </div>
-            </Card>
-
-            <Card>
-                <div className="p-6">
-                     <div className="flex justify-between items-center mb-4">
-                        <h2 className="text-2xl font-bold text-slate-800">הוספת ארוחה</h2>
-                        <button onClick={() => setAppleHealthInfoOpen(true)} className="text-sm text-primary-600 hover:underline">
-                            איך מתחברים ל-Apple Health?
-                        </button>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <button onClick={() => setManualLogOpen(true)} className="w-full text-center p-6 bg-primary-50 hover:bg-primary-100 rounded-lg transition border-2 border-dashed border-primary-200">
-                             <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mx-auto mb-2 text-primary-600"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                            <span className="font-semibold text-primary-700">הוספה ידנית</span>
-                            <p className="text-sm text-primary-600">כתוב מה אכלת</p>
-                        </button>
-                         <button onClick={() => setImageLogOpen(true)} className="w-full text-center p-6 bg-green-50 hover:bg-green-100 rounded-lg transition border-2 border-dashed border-green-200">
-                           <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mx-auto mb-2 text-green-600"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
-                            <span className="font-semibold text-green-700">הוספה מתמונה</span>
-                             <p className="text-sm text-green-600">צלם את הארוחה שלך</p>
-                        </button>
-                    </div>
-                </div>
-            </Card>
-
-            <Card>
-                <div className="p-6">
-                    <h2 className="text-2xl font-bold text-slate-800 mb-4">יומן אכילה יומי</h2>
-                    {todaysLog.length > 0 ? (
-                        <ul className="space-y-3">
-                            {todaysLog.map((item) => (
-                                <li key={item.id} className="p-3 bg-slate-50 rounded-lg flex items-center justify-between">
-                                    <div>
-                                        <p className="font-semibold text-slate-700">{item.name}</p>
-                                        <p className="text-sm text-slate-500">
-                                            {item.calories} קל' &bull; {item.protein}ח' &bull; {item.carbs}פ' &bull; {item.fat}ש'
-                                        </p>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <button onClick={() => setEditingFoodItem(item)} className="p-2 text-slate-400 hover:text-blue-500" title="ערוך פריט">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
-                                        </button>
-                                        <button onClick={() => onDeleteFood(item.id)} className="p-2 text-slate-400 hover:text-red-500" title="מחק פריט">
-                                             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                                        </button>
-                                    </div>
-                                </li>
-                            ))}
-                        </ul>
-                    ) : (
-                        <p className="text-center text-slate-500 py-8">עדיין לא הוספת שום דבר להיום. לחץ על אחת האפשרויות למעלה כדי להתחיל.</p>
-                    )}
-                </div>
-            </Card>
-
-            {/* Modals */}
-            <ManualLogModal 
-                isOpen={isManualLogOpen} 
-                onClose={() => setManualLogOpen(false)} 
-                onLog={handleAddFoodWithId}
-                ai={ai} 
-            />
-            <ImageLogModal
-                isOpen={isImageLogOpen} 
-                onClose={() => setImageLogOpen(false)} 
-                onLog={handleAddFoodWithId} 
-                ai={ai}
-            />
-            <UpdateGoalModal
-                isOpen={isUpdateGoalOpen}
-                onClose={() => setUpdateGoalOpen(false)}
-                onUpdate={onUpdateProfile}
-                userProfile={userProfile}
-            />
-            <UpdateProfileModal
-                isOpen={isUpdateProfileOpen}
-                onClose={() => setUpdateProfileOpen(false)}
-                onUpdate={onUpdateProfile}
-                userProfile={userProfile}
-            />
-            {editingFoodItem && (
-                 <UpdateTimelineModal
-                    isOpen={!!editingFoodItem}
-                    onClose={() => setEditingFoodItem(null)}
-                    onUpdate={handleUpdateFoodWithId}
-                    onDelete={onDeleteFood}
-                    foodItem={editingFoodItem}
-                 />
-            )}
-            <AppleHealthInfoModal 
-                isOpen={isAppleHealthInfoOpen}
-                onClose={() => setAppleHealthInfoOpen(false)}
-            />
+        <div>
+            <div className="flex justify-between items-center mb-1">
+                <span className="text-sm font-medium text-slate-700">{label}</span>
+                <span className="text-sm text-slate-500">{Math.round(value)} / {Math.round(goal)}g</span>
+            </div>
+            <div className="w-full bg-slate-200 rounded-full h-2.5">
+                <div className={`${color} h-2.5 rounded-full`} style={{ width: `${percentage}%` }}></div>
+            </div>
         </div>
     );
+};
+
+const Dashboard: React.FC<DashboardProps> = ({ 
+    userProfile, 
+    foodLog,
+    dailyCalorieGoal,
+    onOpenManualLog, 
+    onOpenImageLog,
+    onOpenUpdateGoal,
+    onOpenUpdateProfile,
+    onOpenUpdateTimeline,
+    onOpenAppleHealthInfo,
+}) => {
+    const consumedCalories = foodLog.reduce((acc, item) => acc + item.calories, 0);
+    const consumedProtein = foodLog.reduce((acc, item) => acc + item.protein, 0);
+    const consumedCarbs = foodLog.reduce((acc, item) => acc + item.carbs, 0);
+    const consumedFat = foodLog.reduce((acc, item) => acc + item.fat, 0);
+    
+    const remainingCalories = dailyCalorieGoal - consumedCalories;
+    const calorieProgress = dailyCalorieGoal > 0 ? (consumedCalories / dailyCalorieGoal) * 100 : 0;
+    
+    // Recommended macros (e.g., 40% carbs, 30% protein, 30% fat)
+    const proteinGoal = (dailyCalorieGoal * 0.30) / 4;
+    const carbsGoal = (dailyCalorieGoal * 0.40) / 4;
+    const fatGoal = (dailyCalorieGoal * 0.30) / 9;
+
+    const formatTime = (isoString: string) => {
+        return new Date(isoString).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+    }
+
+  return (
+    <div className="space-y-6">
+      {/* Daily Summary */}
+      <Card>
+        <div className="p-6">
+          <div className="flex justify-between items-start mb-4">
+            <div>
+              <h2 className="text-xl font-bold text-slate-800">סיכום יומי</h2>
+              <p className="text-slate-500">התקדמות הצריכה הקלורית שלך להיום</p>
+            </div>
+            <div className="flex gap-2">
+                 <button onClick={onOpenUpdateProfile} className="text-slate-500 hover:text-primary-600 p-2" title="ערוך פרופיל">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-user-cog"><circle cx="18" cy="15" r="3"/><path d="M20 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19.5 12.5 22 15"/><path d="m17 18 2.5 2.5"/><path d="M15 18h-2.5"/><path d="M15 12h-2.5"/><path d="m17 12-2.5-2.5"/><path d="M19.5 17.5 22 15"/></svg>
+                </button>
+                <button onClick={onOpenUpdateGoal} className="text-slate-500 hover:text-primary-600 p-2" title="עדכן יעדים">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-goal"><path d="M12 13V2l8 4-8 4"/><path d="M12 22v-9"/><path d="m20 10-8 4-8-4"/><path d="M4 6l8 4v9"/><path d="M18 22c-1.93 0-3.62-.83-4.83-2.17"/><path d="M12.2 17.8a5.17 5.17 0 0 1-4.37 2.37c-2.85 0-5.17-2.32-5.17-5.17s2.32-5.17 5.17-5.17c.4 0 .79.05 1.17.14"/><path d="M18 16.83c1.93 0 3.62.83 4.83 2.17"/></svg>
+                </button>
+            </div>
+          </div>
+          
+          <div className="relative w-40 h-40 mx-auto mb-4">
+            <svg className="w-full h-full" viewBox="0 0 36 36">
+              <path
+                d="M18 2.0845
+                  a 15.9155 15.9155 0 0 1 0 31.831
+                  a 15.9155 15.9155 0 0 1 0 -31.831"
+                fill="none"
+                stroke="#e2e8f0"
+                strokeWidth="3"
+              />
+              <path
+                d="M18 2.0845
+                  a 15.9155 15.9155 0 0 1 0 31.831
+                  a 15.9155 15.9155 0 0 1 0 -31.831"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeDasharray={`${calorieProgress}, 100`}
+                className="text-primary-600"
+                transform="rotate(-90 18 18)"
+              />
+            </svg>
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className="text-3xl font-bold text-slate-800">{Math.round(remainingCalories)}</span>
+                <span className="text-sm text-slate-500">קלוריות נותרו</span>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-3 divide-x divide-slate-200 dir-ltr">
+              <StatCard label="נצרכו" value={Math.round(consumedCalories)} unit="קל'" />
+              <StatCard label="מטרה" value={Math.round(dailyCalorieGoal)} unit="קל'" />
+              <StatCard label="משקל" value={userProfile.weight} unit="קג" />
+          </div>
+        </div>
+        <div className="p-6 border-t border-slate-200 space-y-4">
+            <MacroProgressBar label="חלבון" value={consumedProtein} goal={proteinGoal} color="bg-sky-500" />
+            <MacroProgressBar label="פחמימות" value={consumedCarbs} goal={carbsGoal} color="bg-yellow-500" />
+            <MacroProgressBar label="שומן" value={consumedFat} goal={fatGoal} color="bg-rose-500" />
+        </div>
+      </Card>
+      
+      {/* Log Actions */}
+       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <button onClick={onOpenManualLog} className="w-full p-4 bg-white rounded-xl shadow-md flex items-center justify-center gap-3 text-lg font-semibold text-primary-600 hover:bg-primary-50 transition">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                <span>הוספה ידנית</span>
+            </button>
+            <button onClick={onOpenImageLog} className="w-full p-4 bg-white rounded-xl shadow-md flex items-center justify-center gap-3 text-lg font-semibold text-primary-600 hover:bg-primary-50 transition">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+                <span>הוספה מתמונה</span>
+            </button>
+       </div>
+
+      {/* Food Timeline */}
+      <Card>
+          <div className="p-6">
+            <h2 className="text-xl font-bold text-slate-800 mb-4">היומן שלי להיום</h2>
+            {foodLog.length > 0 ? (
+                <ul className="space-y-4">
+                    {foodLog.map(item => (
+                        <li key={item.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
+                            <div>
+                                <p className="font-semibold text-slate-800">{item.name}</p>
+                                <p className="text-sm text-slate-500">
+                                    {Math.round(item.calories)} קל' &bull; {Math.round(item.protein)} ח' &bull; {Math.round(item.carbs)} פ' &bull; {Math.round(item.fat)} ש'
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className="text-sm text-slate-400">{formatTime(item.timestamp)}</span>
+                                <button onClick={() => onOpenUpdateTimeline(item)} className="text-slate-400 hover:text-primary-600 p-2" title="ערוך פריט">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                </button>
+                            </div>
+                        </li>
+                    ))}
+                </ul>
+            ) : (
+                <div className="text-center py-8">
+                    <p className="text-slate-500">טרם הוספת פריטים להיום.</p>
+                    <p className="text-slate-400 text-sm">השתמש בכפתורים למעלה כדי להתחיל.</p>
+                </div>
+            )}
+            </div>
+      </Card>
+
+        {/* Apple Health Integration Info */}
+        <Card>
+            <div className="p-6 flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-black text-white rounded-lg flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20.94c1.5 0 2.75 1.06 4 1.06 3 0 6-8 6-12.22A4.91 4.91 0 0 0 17 5c-2.22 0-4 1.44-5 2-1-.56-2.78-2-5-2a4.9 4.9 0 0 0-5 4.78C2 14 5 22 8 22c1.25 0 2.5-1.06 4-1.06Z"/><path d="M10 2c1 .5 2 2 2 5"/></svg>
+                    </div>
+                    <div>
+                         <h3 className="font-bold text-slate-800">חיבור ל-Apple Health</h3>
+                         <p className="text-sm text-slate-500">רוצה לסנכרן את הנתונים שלך אוטומטית? (מיועד למפתחים)</p>
+                    </div>
+                </div>
+                <button 
+                    onClick={onOpenAppleHealthInfo}
+                    className="px-4 py-2 bg-slate-200 text-slate-700 rounded-md hover:bg-slate-300 transition text-sm font-semibold">
+                    פרטים נוספים
+                </button>
+            </div>
+        </Card>
+    </div>
+  );
 };
 
 export default Dashboard;
