@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from 'react';
 import { UserProfile, Gender, ActivityLevel, Goal } from '../types';
 import Card from './common/Card';
@@ -17,7 +18,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    const isNumericField = ['age', 'height', 'weight', 'targetWeight'].includes(name);
+    const isNumericField = ['age', 'height', 'weight', 'targetWeight', 'loseWeightWeeks'].includes(name);
     setFormData(prev => ({ ...prev, [name]: isNumericField ? Number(value) : value }));
   };
 
@@ -117,6 +118,12 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                   <option value={Goal.Gain}>עלייה במסה</option>
                 </select>
               </div>
+              {formData.goal === Goal.Lose && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-600 mb-1">בכמה שבועות תרצה להגיע למשקל היעד?</label>
+                  <input type="number" name="loseWeightWeeks" value={formData.loseWeightWeeks || ''} onChange={handleChange} className="w-full p-2 border border-slate-300 rounded-md focus:ring-primary-500 focus:border-primary-500" required min="1" />
+                </div>
+              )}
             </div>
           </div>
         );

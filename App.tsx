@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { GoogleGenAI } from '@google/genai';
-import { UserProfile, FoodItem, ModalType } from './types';
+import { UserProfile, FoodItem, ModalType, WeightEntry } from './types';
 import useLocalStorage from './hooks/useLocalStorage';
 import Header from './components/Header';
 import Dashboard from './components/Dashboard';
@@ -12,7 +12,6 @@ import Footer from './components/common/Footer';
 import dayjs from 'dayjs';
 import 'dayjs/locale/he';
 import relativeTime from 'dayjs/plugin/relativeTime';
-import AppleHealthInfoModal from './components/AppleHealthInfoModal';
 
 dayjs.extend(relativeTime);
 dayjs.locale('he');
@@ -21,6 +20,7 @@ function App() {
   const [profiles, setProfiles] = useLocalStorage<UserProfile[]>('caloric-profiles', []);
   const [activeProfileId, setActiveProfileId] = useLocalStorage<string | null>('caloric-active-profile', null);
   const [foodLogs, setFoodLogs] = useLocalStorage<Record<string, FoodItem[]>>('caloric-food-logs', {});
+  const [weightLogs, setWeightLogs] = useLocalStorage<Record<string, WeightEntry[]>>('caloric-weight-logs', {});
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [modal, setModal] = useState<ModalType>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -66,9 +66,15 @@ function App() {
   const handleDeleteProfile = (id: string) => {
     if (window.confirm("האם למחוק את הפרופיל וכל הנתונים שלו?")) {
       setProfiles(profiles.filter(p => p.id !== id));
+      
       const newFoodLogs = { ...foodLogs };
       delete newFoodLogs[id];
       setFoodLogs(newFoodLogs);
+
+      const newWeightLogs = { ...weightLogs };
+      delete newWeightLogs[id];
+      setWeightLogs(newWeightLogs);
+
       if (activeProfileId === id) {
         setActiveProfileId(null);
       }
@@ -99,6 +105,32 @@ function App() {
     });
   };
 
+  const handleAddWeight = (weight: number) => {
+    if (!activeProfileId) return;
+
+    // 1. Update the weight log
+    const today = dayjs().format('YYYY-MM-DD');
+    const userWeightLog = weightLogs[activeProfileId] || [];
+    const existingEntryIndex = userWeightLog.findIndex(entry => entry.date === today);
+
+    let updatedLog;
+    if (existingEntryIndex !== -1) {
+      updatedLog = [...userWeightLog];
+      updatedLog[existingEntryIndex] = { date: today, weight };
+    } else {
+      updatedLog = [...userWeightLog, { date: today, weight }];
+    }
+    setWeightLogs({ ...weightLogs, [activeProfileId]: updatedLog });
+
+    // 2. Update the active profile's current weight
+    setProfiles(prevProfiles =>
+      prevProfiles.map(p =>
+        p.id === activeProfileId ? { ...p, weight: weight } : p
+      )
+    );
+  };
+
+
   const renderContent = () => {
     if (showOnboarding) {
       return <Onboarding onComplete={handleCreateProfile} />;
@@ -109,8 +141,10 @@ function App() {
         <Dashboard
           userProfile={activeProfile}
           foodLog={currentFoodLog}
+          weightLog={weightLogs[activeProfile.id] || []}
           onAddFood={handleAddFood}
           onRemoveFood={handleRemoveFood}
+          onAddWeight={handleAddWeight}
           setModal={setModal}
           selectedDate={selectedDate}
           setSelectedDate={setSelectedDate}
@@ -165,11 +199,6 @@ function App() {
             ai={ai}
             isLoading={isLoading}
             setIsLoading={setIsLoading}
-          />
-
-          <AppleHealthInfoModal
-            isOpen={modal === 'appleHealthInfo'}
-            onClose={() => setModal(null)}
           />
         </>
       )}

@@ -26,6 +26,7 @@ export interface UserProfile {
   activityLevel: ActivityLevel;
   goal: Goal;
   avatar?: string;
+  loseWeightWeeks?: number;
 }
 
 export interface FoodItem {
@@ -37,6 +38,11 @@ export interface FoodItem {
   timestamp: string;
 }
 
+export interface WeightEntry {
+  date: string; // YYYY-MM-DD
+  weight: number;
+}
+
 export interface NutritionGoals {
     tdee: number;
     bmi: number;
@@ -45,4 +51,4 @@ export interface NutritionGoals {
     fat: number;
 }
 
-export type ModalType = 'image' | 'manual' | 'appleHealthInfo' | null;
+export type ModalType = 'image' | 'manual' | null;
