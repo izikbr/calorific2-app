@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { UserProfile, Gender, ActivityLevel, Goal } from '../types';
 import Card from './common/Card';
 
@@ -13,11 +13,23 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
     activityLevel: ActivityLevel.Medium,
     goal: Goal.Maintain,
   });
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     const isNumericField = ['age', 'height', 'weight', 'targetWeight'].includes(name);
     setFormData(prev => ({ ...prev, [name]: isNumericField ? Number(value) : value }));
+  };
+
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData(prev => ({...prev, avatar: reader.result as string}));
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const nextStep = () => setStep(s => s + 1);
@@ -35,10 +47,21 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
           <div>
             <h2 className="text-xl font-semibold mb-4 text-slate-700">פרטים אישיים</h2>
             <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-600 mb-1">שם / כינוי</label>
-                <input type="text" name="name" value={formData.name || ''} onChange={handleChange} className="w-full p-2 border border-slate-300 rounded-md focus:ring-primary-500 focus:border-primary-500" required />
+              <div className="flex items-center gap-4">
+                  <input type="file" accept="image/*" ref={avatarInputRef} onChange={handleAvatarChange} className="hidden" />
+                  <div className="w-20 h-20 rounded-full bg-slate-200 flex-shrink-0 flex items-center justify-center overflow-hidden cursor-pointer" onClick={() => avatarInputRef.current?.click()}>
+                      {formData.avatar ? (
+                          <img src={formData.avatar} alt="Avatar Preview" className="w-full h-full object-cover" />
+                      ) : (
+                          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-500"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                      )}
+                  </div>
+                  <div className="flex-grow">
+                      <label className="block text-sm font-medium text-slate-600 mb-1">שם / כינוי</label>
+                      <input type="text" name="name" value={formData.name || ''} onChange={handleChange} className="w-full p-2 border border-slate-300 rounded-md focus:ring-primary-500 focus:border-primary-500" required />
+                  </div>
               </div>
+
               <div>
                 <label className="block text-sm font-medium text-slate-600 mb-1">מין</label>
                 <select name="gender" value={formData.gender} onChange={handleChange} className="w-full p-2 border border-slate-300 rounded-md focus:ring-primary-500 focus:border-primary-500">

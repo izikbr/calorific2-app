@@ -109,6 +109,22 @@ const FoodLog: React.FC<{ items: FoodItem[]; onRemove: (timestamp: string) => vo
     </Card>
 );
 
+const Integrations: React.FC<{ setModal: (type: ModalType) => void }> = ({ setModal }) => (
+    <Card>
+        <div className="p-4">
+            <h2 className="text-lg font-semibold text-slate-700 mb-4">חיבור לשירותים חיצוניים</h2>
+            <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                <div className="flex items-center gap-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-red-500"><path d="M12.22 5.82a.5.5 0 0 1 .36.87l-2.65 4.52a.5.5 0 0 1-.87-.51l2.65-4.52a.5.5 0 0 1 .51-.36z"/><path d="M15.25 8.5a.5.5 0 0 1 .52.84l-3.53 4.2a.5.5 0 0 1-.84-.53l3.53-4.2a.5.5 0 0 1 .32-.31z"/><path d="M18.5 11a.5.5 0 0 1 .53.81l-4.56 3.9a.5.5 0 0 1-.81-.54l4.56-3.9a.5.5 0 0 1 .28-.23z"/><path d="M6.5 12.5a.5.5 0 0 1 .52-.84l4.18 3.53a.5.5 0 0 1-.53.84l-4.18-3.53a.5.5 0 0 1-.01-1z"/><path d="M20.8 13.7a.5.5 0 0 1 .58.75l-5.65 3.43a.5.5 0 0 1-.75-.58l5.65-3.43a.5.5 0 0 1 .17-.17z"/><path d="M12 22c-5.523 0-10-4.477-10-10S6.477 2 12 2s10 4.477 10 10c0 2.22-.72 4.26-1.91 5.92"/></svg>
+                    <p className="font-semibold text-slate-800">Apple Health</p>
+                </div>
+                <button onClick={() => setModal('appleHealthInfo')} className="px-4 py-2 bg-slate-200 text-slate-700 text-sm font-semibold rounded-md hover:bg-slate-300 transition">
+                    התחבר
+                </button>
+            </div>
+        </div>
+    </Card>
+);
 
 const Dashboard: React.FC<DashboardProps> = ({ userProfile, foodLog, onAddFood, onRemoveFood, setModal }) => {
   const nutritionGoals = useMemo(() => calculateNutritionGoals(userProfile), [userProfile]);
@@ -140,6 +156,8 @@ const Dashboard: React.FC<DashboardProps> = ({ userProfile, foodLog, onAddFood, 
             </button>
        </div>
        
+       <Integrations setModal={setModal} />
+
        <FoodLog items={foodLog} onRemove={onRemoveFood} />
     </div>
   );

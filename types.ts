@@ -25,6 +25,7 @@ export interface UserProfile {
   targetWeight: number;
   activityLevel: ActivityLevel;
   goal: Goal;
+  avatar?: string;
 }
 
 export interface FoodItem {
@@ -44,4 +45,4 @@ export interface NutritionGoals {
     fat: number;
 }
 
-export type ModalType = 'image' | 'manual' | null;
+export type ModalType = 'image' | 'manual' | 'appleHealthInfo' | null;

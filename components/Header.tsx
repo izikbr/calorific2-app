@@ -18,7 +18,16 @@ const Header: React.FC<HeaderProps> = ({ userProfile, onLogout }) => {
         <Logo />
         {userProfile && (
           <div className="flex items-center gap-4">
-            <span className="text-slate-600 hidden sm:inline">שלום, {userProfile.name}</span>
+            <div className="flex items-center gap-2">
+                <span className="text-slate-600 hidden sm:inline">שלום, {userProfile.name}</span>
+                {userProfile.avatar ? (
+                    <img src={userProfile.avatar} alt={userProfile.name} className="w-8 h-8 rounded-full object-cover" />
+                ) : (
+                    <span className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-500"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    </span>
+                )}
+            </div>
             <button
               onClick={onLogout}
               className="text-sm text-slate-500 hover:text-primary-600 transition-colors"

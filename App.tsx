@@ -12,6 +12,7 @@ import Footer from './components/common/Footer';
 import dayjs from 'dayjs';
 import 'dayjs/locale/he';
 import relativeTime from 'dayjs/plugin/relativeTime';
+import AppleHealthInfoModal from './components/AppleHealthInfoModal';
 
 dayjs.extend(relativeTime);
 dayjs.locale('he');
@@ -158,6 +159,11 @@ function App() {
             ai={ai}
             isLoading={isLoading}
             setIsLoading={setIsLoading}
+          />
+
+          <AppleHealthInfoModal
+            isOpen={modal === 'appleHealthInfo'}
+            onClose={() => setModal(null)}
           />
         </>
       )}

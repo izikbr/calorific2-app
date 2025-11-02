@@ -22,8 +22,15 @@ const UserSelection: React.FC<UserSelectionProps> = ({ profiles, onSelectProfile
         {profiles.length > 0 && (
           <ul className="space-y-3 text-start mb-6">
             {profiles.map(profile => (
-              <li key={profile.id} className="group flex items-center justify-between p-4 bg-slate-100 rounded-lg hover:bg-primary-100 transition-colors cursor-pointer" onClick={() => onSelectProfile(profile.id)}>
-                <div className="flex-grow">
+              <li key={profile.id} className="group flex items-center justify-between p-3 bg-slate-100 rounded-lg hover:bg-primary-100 transition-colors cursor-pointer" onClick={() => onSelectProfile(profile.id)}>
+                <div className="flex items-center gap-4 flex-grow">
+                    {profile.avatar ? (
+                        <img src={profile.avatar} alt={profile.name} className="w-12 h-12 rounded-full object-cover" />
+                    ) : (
+                        <span className="w-12 h-12 rounded-full bg-slate-200 flex items-center justify-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-500"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                        </span>
+                    )}
                   <span className="font-semibold text-lg text-slate-700 group-hover:text-primary-700">{profile.name}</span>
                 </div>
                 <button
