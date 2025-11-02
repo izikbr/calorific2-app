@@ -90,13 +90,13 @@ const Dashboard: React.FC<DashboardProps> = ({ userProfile, foodLog, nutritionGo
     { name: 'שומן', value: totals.fat, goal: nutritionGoals.fat, fill: '#f59e0b', colorClass: 'bg-amber-500' },
   ];
   
-  const today = new Date().toISOString().split('T')[0];
+  const today = new Date().toLocaleDateString('en-CA');
   const isToday = selectedDate === today;
 
   const handleDateChange = (days: number) => {
-    const currentDate = new Date(selectedDate + 'T00:00:00Z'); // Treat string as UTC to avoid timezone issues
-    currentDate.setUTCDate(currentDate.getUTCDate() + days);
-    onDateChange(currentDate.toISOString().split('T')[0]);
+    const currentDate = new Date(selectedDate + 'T00:00:00');
+    currentDate.setDate(currentDate.getDate() + days);
+    onDateChange(currentDate.toLocaleDateString('en-CA'));
   };
 
   return (

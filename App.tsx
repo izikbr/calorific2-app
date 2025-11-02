@@ -15,7 +15,7 @@ const App: React.FC = () => {
   const [activeUser, setActiveUser] = useState<UserProfile | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
   
-  const [selectedDate, setSelectedDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState<string>(() => new Date().toLocaleDateString('en-CA'));
 
   const foodLogKey = activeUser ? `foodLog-${activeUser.id}-${selectedDate}` : '';
   const [foodLog, setFoodLog] = useLocalStorage<FoodItem[]>(foodLogKey, []);
@@ -53,7 +53,7 @@ const App: React.FC = () => {
   
   const handleSelectUser = (user: UserProfile) => {
     setActiveUser(user);
-    setSelectedDate(new Date().toISOString().split('T')[0]);
+    setSelectedDate(new Date().toLocaleDateString('en-CA'));
   }
   
   const handleAddNewUser = () => {
