@@ -1,3 +1,4 @@
+// FIX: Defined all necessary types and enums for the application.
 export enum Gender {
   Male = 'male',
   Female = 'female',
@@ -15,12 +16,6 @@ export enum Goal {
   Gain = 'gain',
 }
 
-export interface WeightEntry {
-  date: string; // YYYY-MM-DD
-  weight: number;
-}
-
-
 export interface UserProfile {
   id: string;
   name: string;
@@ -33,17 +28,14 @@ export interface UserProfile {
   activityLevel: ActivityLevel;
   goal: Goal;
   loseWeightWeeks?: number;
-  weightLog?: WeightEntry[];
 }
 
 export interface FoodItem {
   id: string;
+  timestamp: string;
   name: string;
   calories: number;
   protein: number;
   carbs: number;
   fat: number;
-  timestamp: string;
 }
-
-export type ModalType = 'manualLog' | 'imageLog' | 'updateProfile' | 'updateTimeline' | 'quickAdd';
