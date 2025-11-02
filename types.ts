@@ -1,3 +1,4 @@
+// FIX: Implemented the core TypeScript types and enums.
 export enum Gender {
   Male = 'male',
   Female = 'female',
@@ -15,40 +16,27 @@ export enum Goal {
   Gain = 'gain',
 }
 
-export interface UserProfile {
-  id: string;
-  name: string;
-  gender: Gender;
-  age: number;
-  height: number;
-  weight: number;
-  targetWeight: number;
-  activityLevel: ActivityLevel;
-  goal: Goal;
-  avatar?: string;
-  loseWeightWeeks?: number;
-}
-
 export interface FoodItem {
+  id: string;
   name: string;
   calories: number;
   protein: number;
   carbs: number;
   fat: number;
-  timestamp: string;
+  timestamp: string; // ISO string
 }
 
-export interface WeightEntry {
-  date: string; // YYYY-MM-DD
-  weight: number;
+export interface UserProfile {
+  id: string;
+  name: string;
+  avatar?: string;
+  age: number;
+  gender: Gender;
+  height: number; // in cm
+  weight: number; // in kg
+  targetWeight: number; // in kg
+  activityLevel: ActivityLevel;
+  goal: Goal;
+  loseWeightWeeks?: number;
+  foodLog?: FoodItem[];
 }
-
-export interface NutritionGoals {
-    tdee: number;
-    bmi: number;
-    protein: number;
-    carbs: number;
-    fat: number;
-}
-
-export type ModalType = 'image' | 'manual' | null;
