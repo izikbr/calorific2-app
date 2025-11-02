@@ -1,6 +1,6 @@
 {
-  "name": "Calorific: Smart Nutrition Tracker",
-  "description": "An intelligent nutrition tracking application that allows users to monitor their daily calorie intake automatically using AI-powered food recognition from photos or manual entry. It provides personalized daily calorie targets based on user goals and physical data.",
+  "name": "קלוריק: מעקב תזונתי חכם",
+  "description": "אפליקציית מעקב תזונה חכמה שנוצרה ע\"י IZIKBR. מאפשרת למשתמשים לנטר את צריכת הקלוריות היומית שלהם באופן אוטומטי באמצעות זיהוי מזון מבוסס AI מתמונות או באמצעות הזנה ידנית. האפליקציה מספקת יעדי קלוריות יומיים מותאמים אישית בהתבסס על מטרות המשתמש ונתוניו הפיזיים.",
   "requestFramePermissions": [
     "camera"
   ]

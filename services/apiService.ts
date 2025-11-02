@@ -1,111 +1,85 @@
-import { GoogleGenAI, GenerateContentResponse, Type } from '@google/genai';
-import { UserProfile, Gender, NutritionGoals, FoodItem } from '../types';
-import { ACTIVITY_FACTORS, GOAL_ADJUSTMENTS } from '../constants';
+// FIX: Implemented Gemini API service functions to resolve module not found errors.
+import { GoogleGenAI, Type } from "@google/genai";
+import { FoodItem } from '../types';
 
-export const calculateNutritionGoals = (profile: UserProfile): NutritionGoals => {
-  const { gender, weight, height, age, activityLevel, goal } = profile;
-
-  // Calculate BMR using Mifflin-St Jeor
-  let bmr: number;
-  if (gender === Gender.Male) {
-    bmr = 10 * weight + 6.25 * height - 5 * age + 5;
-  } else {
-    bmr = 10 * weight + 6.25 * height - 5 * age - 161;
-  }
-
-  const activityFactor = ACTIVITY_FACTORS[activityLevel];
-  const maintenanceCalories = bmr * activityFactor;
-  const goalAdjustment = GOAL_ADJUSTMENTS[goal];
-  const tdee = Math.round(maintenanceCalories + goalAdjustment);
-
-  // Calculate BMI
-  const heightInMeters = height / 100;
-  const bmi = parseFloat((weight / (heightInMeters * heightInMeters)).toFixed(1));
-  
-  // Calculate Macros (40% carbs, 30% protein, 30% fat)
-  const protein = Math.round((tdee * 0.30) / 4);
-  const carbs = Math.round((tdee * 0.40) / 4);
-  const fat = Math.round((tdee * 0.30) / 9);
-
-
-  return { tdee, bmi, protein, carbs, fat };
-};
-
-const fileToBase64 = (file: File): Promise<string> => {
-  return new Promise((resolve, reject) => {
+// Helper function to convert a File object to a base64 string
+const fileToGenerativePart = async (file: File) => {
+  const base64EncodedDataPromise = new Promise<string>((resolve) => {
     const reader = new FileReader();
+    reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
     reader.readAsDataURL(file);
-    reader.onload = () => {
-      const result = reader.result as string;
-      resolve(result.split(',')[1]);
-    };
-    reader.onerror = (error) => reject(error);
   });
+  return {
+    inlineData: { data: await base64EncodedDataPromise, mimeType: file.type },
+  };
 };
 
 export const getFoodFromImage = async (ai: GoogleGenAI, imageFile: File): Promise<FoodItem[]> => {
-    const base64Image = await fileToBase64(imageFile);
-    const imagePart = {
-        inlineData: {
-            mimeType: imageFile.type,
-            data: base64Image,
-        },
-    };
-    const textPart = {
-        text: `אתה תזונאי מומחה. נתח את תמונת הארוחה הזו. זהה כל פריט מזון והערך את משקלו בגרמים. ספק את הערכת הקלוריות, חלבון (בגרמים), פחמימות (בגרמים), ושומן (בגרמים) עבור כל פריט. הגב רק עם אובייקט JSON המכיל מפתח יחיד 'items' שהוא מערך של אובייקטי מזון. כל אובייקט חייב להכיל את המפתחות הבאים: 'name' (בעברית), 'calories' (מספר), 'protein' (מספר), 'carbs' (מספר), 'fat' (מספר). אל תכלול טקסט מקדים או הסברים.`
-    };
+  try {
+    const imagePart = await fileToGenerativePart(imageFile);
+    
+    const prompt = `
+      Analyze the image and identify all distinct food items present.
+      For each item, provide an estimated nutritional breakdown (calories, protein, carbs, fat).
+      Return the data as a JSON array of objects. Each object should represent a food item and have the following properties: "name" (string), "calories" (number), "protein" (number), "carbs" (number), "fat" (number).
+      If no food is identifiable, return an empty array.
+      Provide the name in Hebrew.
+    `;
 
-    const response: GenerateContentResponse = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: { parts: [imagePart, textPart] },
-        config: {
-          responseMimeType: "application/json",
-          // FIX: Add responseSchema to ensure structured JSON output from the model.
-          responseSchema: {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: { parts: [imagePart, { text: prompt }] },
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
             type: Type.OBJECT,
             properties: {
-              items: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    name: { type: Type.STRING },
-                    calories: { type: Type.NUMBER },
-                    protein: { type: Type.NUMBER },
-                    carbs: { type: Type.NUMBER },
-                    fat: { type: Type.NUMBER },
-                  },
-                }
-              }
+              name: { type: Type.STRING },
+              calories: { type: Type.NUMBER },
+              protein: { type: Type.NUMBER },
+              carbs: { type: Type.NUMBER },
+              fat: { type: Type.NUMBER },
             },
-          }
-        }
+            required: ['name', 'calories', 'protein', 'carbs', 'fat'],
+          },
+        },
+      },
     });
 
-    try {
-        const jsonString = response.text.trim();
-        const result = JSON.parse(jsonString);
-        if (result.items && Array.isArray(result.items)) {
-            return result.items.map((item: any) => ({
-                ...item,
-                timestamp: new Date().toISOString()
-            }));
-        }
-    } catch (e) {
-        console.error("Error parsing Gemini response:", e);
+    const jsonText = response.text.trim();
+    const parsedResponse = JSON.parse(jsonText);
+
+    if (Array.isArray(parsedResponse)) {
+       return parsedResponse.map(item => ({
+        ...item,
+        timestamp: new Date().toISOString()
+       }));
     }
     return [];
+
+  } catch (error) {
+    console.error("Error analyzing image with Gemini:", error);
+    throw error;
+  }
 };
 
-export const getNutritionInfoFromText = async (ai: GoogleGenAI, query: string): Promise<FoodItem | null> => {
-  const prompt = `אתה מסד נתונים תזונתי. עבור פריט המזון "${query}", ספק את המידע התזונתי שלו. הגב רק עם אובייקט JSON עם המפתחות הבאים: 'name' (בעברית), 'calories' (מספר), 'protein' (מספר), 'carbs' (מספר), 'fat' (מספר). אם אינך מוצא את הפריט, החזר אובייקט עם כל הערכים כאפס.`
 
-  const response: GenerateContentResponse = await ai.models.generateContent({
+export const getNutritionInfoFromText = async (ai: GoogleGenAI, query: string): Promise<FoodItem | null> => {
+  try {
+    const prompt = `
+      Analyze the following food description: "${query}".
+      Provide an estimated nutritional breakdown for the entire meal described (calories, protein, carbs, fat).
+      Return the data as a single JSON object with the following properties: "name" (string, summarizing the meal in Hebrew), "calories" (number), "protein" (number), "carbs" (number), "fat" (number).
+      If you cannot determine the nutritional information from the query, the values should be 0.
+    `;
+    
+    const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: prompt,
       config: {
         responseMimeType: "application/json",
-        // FIX: Add responseSchema to ensure structured JSON output from the model.
         responseSchema: {
           type: Type.OBJECT,
           properties: {
@@ -115,21 +89,26 @@ export const getNutritionInfoFromText = async (ai: GoogleGenAI, query: string): 
             carbs: { type: Type.NUMBER },
             fat: { type: Type.NUMBER },
           },
-        }
-      }
-  });
+          required: ['name', 'calories', 'protein', 'carbs', 'fat'],
+        },
+      },
+    });
 
-  try {
-      const jsonString = response.text.trim();
-      const result = JSON.parse(jsonString);
-      if (result.calories > 0) {
-        return {
-          ...result,
-          timestamp: new Date().toISOString()
-        }
-      }
-  } catch (e) {
-      console.error("Error parsing Gemini response:", e);
+    const jsonText = response.text.trim();
+    if (!jsonText) return null;
+
+    const parsedResponse = JSON.parse(jsonText);
+    
+    if (parsedResponse && typeof parsedResponse === 'object' && 'name' in parsedResponse && parsedResponse.calories > 0) {
+       return {
+        ...parsedResponse,
+        timestamp: new Date().toISOString()
+       };
+    }
+    return null;
+
+  } catch (error) {
+    console.error("Error getting nutrition info from text with Gemini:", error);
+    throw error;
   }
-  return null;
 };

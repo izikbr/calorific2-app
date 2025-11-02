@@ -1,118 +1,121 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { GoogleGenAI } from '@google/genai';
+import { UserProfile, FoodItem, ModalType } from './types';
+import useLocalStorage from './hooks/useLocalStorage';
+
+import Header from './components/Header';
+import UserSelection from './components/UserSelection';
 import Onboarding from './components/Onboarding';
 import Dashboard from './components/Dashboard';
-import Header from './components/Header';
-import useLocalStorage from './hooks/useLocalStorage';
-import { UserProfile, FoodItem, ModalType } from './types';
-import { calculateNutritionGoals } from './services/apiService';
 import ImageLogModal from './components/ImageLogModal';
 import ManualLogModal from './components/ManualLogModal';
-import UserSelection from './components/UserSelection';
+import Footer from './components/common/Footer';
 
 const App: React.FC = () => {
-  const [registeredUsers, setRegisteredUsers] = useLocalStorage<UserProfile[]>('registeredUsers', []);
-  const [activeUser, setActiveUser] = useState<UserProfile | null>(null);
-  const [showOnboarding, setShowOnboarding] = useState(false);
-  
-  const [selectedDate, setSelectedDate] = useState<string>(() => new Date().toLocaleDateString('en-CA'));
+  const [profiles, setProfiles] = useLocalStorage<UserProfile[]>('calorik-profiles', []);
+  const [selectedProfile, setSelectedProfile] = useState<UserProfile | null>(null);
 
-  const foodLogKey = activeUser ? `foodLog-${activeUser.id}-${selectedDate}` : '';
+  const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+  const foodLogKey = useMemo(() => selectedProfile ? `calorik-foodlog-${selectedProfile.id}-${today}` : '', [selectedProfile, today]);
+  
   const [foodLog, setFoodLog] = useLocalStorage<FoodItem[]>(foodLogKey, []);
-  
-  const [activeModal, setActiveModal] = useState<ModalType>(null);
+
+  const [modal, setModal] = useState<ModalType>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [appState, setAppState] = useState<'selecting' | 'onboarding' | 'dashboard'>('selecting');
 
-  const nutritionGoals = useMemo(() => {
-    if (activeUser) {
-      return calculateNutritionGoals(activeUser);
+  // FIX: Initialize Gemini AI client. API_KEY is expected to be in environment variables.
+  const ai = useMemo(() => new GoogleGenAI({apiKey: process.env.API_KEY as string}), []);
+
+  useEffect(() => {
+    if (selectedProfile) {
+      setAppState('dashboard');
+    } else if (profiles.length > 0) {
+      setAppState('selecting');
+    } else {
+      setAppState('onboarding');
     }
-    return { tdee: 0, bmi: 0, protein: 0, carbs: 0, fat: 0 };
-  }, [activeUser]);
+  }, [selectedProfile, profiles]);
 
-  const handleOnboardingComplete = (profileData: Omit<UserProfile, 'id'>) => {
-    const newUser = { ...profileData, id: Date.now().toString() };
-    setRegisteredUsers(prev => [...prev, newUser]);
-    setActiveUser(newUser);
-    setShowOnboarding(false);
+  const handleSelectUser = (user: UserProfile) => {
+    setSelectedProfile(user);
   };
-
-  const addFoodItem = (item: FoodItem | FoodItem[]) => {
-    const itemsToAdd = Array.isArray(item) ? item : [item];
-    setFoodLog(prevLog => [...prevLog, ...itemsToAdd]);
-    setActiveModal(null);
-  };
-
-  const removeFoodItem = (index: number) => {
-    setFoodLog(prevLog => prevLog.filter((_, i) => i !== index));
-  }
 
   const handleLogout = () => {
-    setActiveUser(null);
-  }
+    setSelectedProfile(null);
+  };
   
-  const handleSelectUser = (user: UserProfile) => {
-    setActiveUser(user);
-    setSelectedDate(new Date().toLocaleDateString('en-CA'));
-  }
-  
-  const handleAddNewUser = () => {
-    setShowOnboarding(true);
+  const handleShowOnboarding = () => {
+      setAppState('onboarding');
   }
 
-  const ai = process.env.API_KEY ? new GoogleGenAI({ apiKey: process.env.API_KEY }) : null;
+  const handleOnboardingComplete = (profileData: Omit<UserProfile, 'id'>) => {
+    const newProfile: UserProfile = {
+      ...profileData,
+      id: new Date().getTime().toString(),
+    };
+    setProfiles(prev => [...prev, newProfile]);
+    setSelectedProfile(newProfile);
+  };
+
+  const handleAddFood = (itemOrItems: FoodItem | FoodItem[]) => {
+    const itemsToAdd = Array.isArray(itemOrItems) ? itemOrItems : [itemOrItems];
+    setFoodLog(prev => [...prev, ...itemsToAdd]);
+    if(modal) {
+       setModal(null);
+    }
+  };
+
+  const handleRemoveFood = (timestamp: string) => {
+    setFoodLog(prev => prev.filter(item => item.timestamp !== timestamp));
+  };
   
   const renderContent = () => {
-    if (activeUser) {
-      return (
-         <>
-            <Dashboard
-              userProfile={activeUser}
-              foodLog={foodLog}
-              nutritionGoals={nutritionGoals}
-              onOpenModal={setActiveModal}
-              onRemoveFoodItem={removeFoodItem}
-              selectedDate={selectedDate}
-              onDateChange={setSelectedDate}
-              isAiEnabled={!!ai}
+      switch(appState) {
+          case 'dashboard':
+            return selectedProfile && <Dashboard 
+                userProfile={selectedProfile} 
+                foodLog={foodLog}
+                onAddFood={handleAddFood}
+                onRemoveFood={handleRemoveFood}
+                setModal={setModal}
+            />;
+          case 'onboarding':
+            return <Onboarding onComplete={handleOnboardingComplete} />;
+          case 'selecting':
+          default:
+            return <UserSelection 
+                users={profiles}
+                onSelectUser={handleSelectUser}
+                onAddNewUser={handleShowOnboarding}
             />
-            {ai && (
-              <>
-                <ImageLogModal
-                  isOpen={activeModal === 'image'}
-                  onClose={() => setActiveModal(null)}
-                  onAddFood={addFoodItem}
-                  ai={ai}
-                  isLoading={isLoading}
-                  setIsLoading={setIsLoading}
-                />
-                <ManualLogModal
-                  isOpen={activeModal === 'manual'}
-                  onClose={() => setActiveModal(null)}
-                  onAddFood={addFoodItem}
-                  ai={ai}
-                  isLoading={isLoading}
-                  setIsLoading={setIsLoading}
-                />
-              </>
-            )}
-          </>
-      )
-    }
-    
-    if (showOnboarding || registeredUsers.length === 0) {
-      return <Onboarding onComplete={handleOnboardingComplete} />;
-    }
-    
-    return <UserSelection users={registeredUsers} onSelectUser={handleSelectUser} onAddNewUser={handleAddNewUser} />;
+      }
   }
 
   return (
-    <div className="bg-slate-50 min-h-screen text-slate-800">
-      <Header userProfile={activeUser} onLogout={handleLogout} />
-      <main className="p-4 sm:p-6 md:p-8 max-w-4xl mx-auto">
+    <div className="bg-slate-50 min-h-screen flex flex-col font-sans text-slate-800">
+      <Header userProfile={selectedProfile} onLogout={handleLogout} />
+      <main className="flex-grow container mx-auto max-w-4xl p-4 sm:p-6">
         {renderContent()}
       </main>
+      
+      <ImageLogModal 
+        isOpen={modal === 'image'} 
+        onClose={() => setModal(null)}
+        onAddFood={handleAddFood}
+        ai={ai}
+        isLoading={isLoading}
+        setIsLoading={setIsLoading}
+      />
+      <ManualLogModal 
+        isOpen={modal === 'manual'}
+        onClose={() => setModal(null)}
+        onAddFood={handleAddFood}
+        ai={ai}
+        isLoading={isLoading}
+        setIsLoading={setIsLoading}
+      />
+      <Footer />
     </div>
   );
 };

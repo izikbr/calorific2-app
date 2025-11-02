@@ -12,7 +12,7 @@ const UserSelection: React.FC<UserSelectionProps> = ({ users, onSelectUser, onAd
   return (
     <Card>
       <div className="p-8 text-center">
-        <h1 className="text-2xl font-bold text-slate-800 mb-2">ברוכים השבים לקלוריק!</h1>
+        <h1 className="text-2xl font-bold text-slate-800 mb-2">ברוכים השבים ל-קלוריק!</h1>
         <p className="text-slate-500 mb-8">מי משתמש באפליקציה היום?</p>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mb-8">

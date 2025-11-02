@@ -108,7 +108,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
   return (
     <Card>
       <div className="p-6">
-        <h1 className="text-2xl font-bold text-center mb-2">ברוכים הבאים לקלוריק!</h1>
+        <h1 className="text-2xl font-bold text-center mb-2">ברוכים הבאים ל-קלוריק!</h1>
         <p className="text-center text-slate-500 mb-6">בואו נבנה לכם תוכנית תזונה מותאמת אישית.</p>
         
         <div className="w-full bg-slate-200 rounded-full h-2.5 mb-6">

@@ -6,11 +6,16 @@ interface HeaderProps {
   onLogout: () => void;
 }
 
+const Logo: React.FC = () => (
+    <h1 className="text-3xl font-bold text-primary-600">קלוריק</h1>
+);
+
+
 const Header: React.FC<HeaderProps> = ({ userProfile, onLogout }) => {
   return (
     <header className="bg-white shadow-sm sticky top-0 z-10">
       <div className="max-w-4xl mx-auto p-4 flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-primary-600">קלוריק</h1>
+        <Logo />
         {userProfile && (
           <div className="flex items-center gap-4">
             <span className="text-slate-600 hidden sm:inline">שלום, {userProfile.name}</span>

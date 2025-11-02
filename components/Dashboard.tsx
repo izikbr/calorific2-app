@@ -1,221 +1,146 @@
+// FIX: Implemented the Dashboard component to display user-specific nutritional information.
 import React, { useMemo } from 'react';
-import { ResponsiveContainer, PieChart, Pie, Cell, Legend, Tooltip } from 'recharts';
-import { UserProfile, FoodItem, NutritionGoals, ModalType } from '../types';
+import { UserProfile, FoodItem, NutritionGoals, ModalType, Gender } from '../types';
+import { ACTIVITY_FACTORS, GOAL_ADJUSTMENTS } from '../constants';
 import Card from './common/Card';
 
 interface DashboardProps {
   userProfile: UserProfile;
   foodLog: FoodItem[];
-  nutritionGoals: NutritionGoals;
-  onOpenModal: (type: ModalType) => void;
-  onRemoveFoodItem: (index: number) => void;
-  selectedDate: string;
-  onDateChange: (date: string) => void;
-  isAiEnabled: boolean;
+  onAddFood: (items: FoodItem[] | FoodItem) => void;
+  onRemoveFood: (timestamp: string) => void;
+  setModal: (type: ModalType) => void;
 }
 
-const StatCard: React.FC<{ title: string; value: string | number; unit: string; }> = ({ title, value, unit }) => (
-    <div className="bg-slate-100 p-4 rounded-lg text-center">
-        <p className="text-sm text-slate-500">{title}</p>
-        <p className="text-2xl font-bold text-primary-600">
-            {value} <span className="text-base font-normal text-slate-600">{unit}</span>
-        </p>
-    </div>
+const calculateNutritionGoals = (profile: UserProfile): NutritionGoals => {
+  // Mifflin-St Jeor Equation for BMR
+  const bmr =
+    profile.gender === Gender.Male
+      ? 10 * profile.weight + 6.25 * profile.height - 5 * profile.age + 5
+      : 10 * profile.weight + 6.25 * profile.height - 5 * profile.age - 161;
+
+  const tdee = bmr * ACTIVITY_FACTORS[profile.activityLevel];
+  const calorieGoal = tdee + GOAL_ADJUSTMENTS[profile.goal];
+
+  // Macronutrient split: 40% Carbs, 30% Protein, 30% Fat
+  const proteinGoal = (calorieGoal * 0.3) / 4; // 4 kcal per gram
+  const carbsGoal = (calorieGoal * 0.4) / 4;   // 4 kcal per gram
+  const fatGoal = (calorieGoal * 0.3) / 9;     // 9 kcal per gram
+  
+  const bmi = profile.weight / ((profile.height / 100) ** 2);
+
+  return { tdee: calorieGoal, bmi, protein: proteinGoal, carbs: carbsGoal, fat: fatGoal };
+};
+
+const NutritionSummary: React.FC<{ goals: NutritionGoals; consumed: Omit<FoodItem, 'name' | 'timestamp'> }> = ({ goals, consumed }) => {
+    const stats = [
+        { label: 'קלוריות', consumed: consumed.calories, goal: goals.tdee, unit: '' },
+        { label: 'חלבון', consumed: consumed.protein, goal: goals.protein, unit: 'ג' },
+        { label: 'פחמימות', consumed: consumed.carbs, goal: goals.carbs, unit: 'ג' },
+        { label: 'שומן', consumed: consumed.fat, goal: goals.fat, unit: 'ג' },
+    ];
+    
+    return (
+        <Card>
+            <div className="p-4">
+                <h2 className="text-lg font-semibold text-slate-700 mb-4">סיכום יומי</h2>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {stats.map(stat => {
+                        const progress = stat.goal > 0 ? (stat.consumed / stat.goal) * 100 : 0;
+                        return (
+                            <div key={stat.label} className="flex flex-col items-center text-center">
+                                <div className="relative w-24 h-24">
+                                    <svg className="w-full h-full" viewBox="0 0 36 36">
+                                        <path
+                                            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                            fill="none"
+                                            stroke="#e2e8f0"
+                                            strokeWidth="3"
+                                        />
+                                        <path
+                                            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                            fill="none"
+                                            stroke={progress > 100 ? '#ef4444' : '#10b981'}
+                                            strokeWidth="3"
+                                            strokeDasharray={`${progress > 100 ? 100 : progress}, 100`}
+                                            strokeLinecap="round"
+                                            transform="rotate(-90 18 18)"
+                                        />
+                                    </svg>
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                         <span className="text-xl font-bold text-slate-800">{stat.consumed.toFixed(0)}</span>
+                                         <span className="text-xs text-slate-500">/{stat.goal.toFixed(0)}{stat.unit}</span>
+                                    </div>
+                                </div>
+                                <span className="mt-2 text-sm font-medium text-slate-600">{stat.label}</span>
+                            </div>
+                        )
+                    })}
+                </div>
+            </div>
+        </Card>
+    );
+};
+
+const FoodLog: React.FC<{ items: FoodItem[]; onRemove: (timestamp: string) => void }> = ({ items, onRemove }) => (
+    <Card>
+        <div className="p-4">
+            <h2 className="text-lg font-semibold text-slate-700 mb-4">יומן אכילה</h2>
+            {items.length === 0 ? (
+                <p className="text-slate-500 text-center py-4">היומן שלך ריק. הוסף פריטים כדי להתחיל!</p>
+            ) : (
+                <ul className="space-y-3">
+                    {items.map(item => (
+                        <li key={item.timestamp} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                           <div>
+                             <p className="font-semibold text-slate-800">{item.name}</p>
+                             <p className="text-sm text-slate-500">
+                                 {item.calories.toFixed(0)} קל' • ח: {item.protein.toFixed(0)} • פ: {item.carbs.toFixed(0)} • ש: {item.fat.toFixed(0)}
+                             </p>
+                           </div>
+                           <button onClick={() => onRemove(item.timestamp)} className="text-slate-400 hover:text-red-500 transition">
+                               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                           </button>
+                        </li>
+                    ))}
+                </ul>
+            )}
+        </div>
+    </Card>
 );
 
-const MacroProgressBar: React.FC<{
-  name: string;
-  value: number;
-  goal: number;
-  color: string;
-}> = ({ name, value, goal, color }) => {
-  const progress = goal > 0 ? Math.min((value / goal) * 100, 100) : 0;
-  return (
-    <div>
-      <div className="flex justify-between mb-1">
-        <span className="text-sm font-medium text-slate-700">{name}</span>
-        <span className="text-sm text-slate-500">{value.toFixed(0)} / {goal.toFixed(0)} ג'</span>
-      </div>
-      <div className="w-full bg-slate-200 rounded-full h-2.5">
-        <div className={`${color} h-2.5 rounded-full transition-all duration-500`} style={{ width: `${progress}%` }}></div>
-      </div>
-    </div>
-  );
-};
 
-const formatDateDisplay = (dateString: string): string => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+const Dashboard: React.FC<DashboardProps> = ({ userProfile, foodLog, onAddFood, onRemoveFood, setModal }) => {
+  const nutritionGoals = useMemo(() => calculateNutritionGoals(userProfile), [userProfile]);
 
-    // The 'YYYY-MM-DD' format is parsed as UTC midnight by default in many JS engines.
-    // To ensure a correct comparison with the local `today`, we explicitly construct the 
-    // date object in the local timezone by appending the time part.
-    const date = new Date(dateString + 'T00:00:00');
-
-    if (date.getTime() === today.getTime()) {
-        return 'סיכום יומי';
-    }
-    
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    if (date.getTime() === yesterday.getTime()) {
-        return 'אתמול';
-    }
-    
-    return new Intl.DateTimeFormat('he-IL', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(date);
-};
-
-
-const Dashboard: React.FC<DashboardProps> = ({ userProfile, foodLog, nutritionGoals, onOpenModal, onRemoveFoodItem, selectedDate, onDateChange, isAiEnabled }) => {
-
-  const totals = useMemo(() => {
+  const consumedTotals = useMemo(() => {
     return foodLog.reduce(
-      (acc, item) => {
-        acc.calories += item.calories;
-        acc.protein += item.protein;
-        acc.carbs += item.carbs;
-        acc.fat += item.fat;
-        return acc;
-      },
+      (acc, item) => ({
+        calories: acc.calories + item.calories,
+        protein: acc.protein + item.protein,
+        carbs: acc.carbs + item.carbs,
+        fat: acc.fat + item.fat,
+      }),
       { calories: 0, protein: 0, carbs: 0, fat: 0 }
     );
   }, [foodLog]);
 
-  const caloriesRemaining = nutritionGoals.tdee - totals.calories;
-  const calorieProgress = nutritionGoals.tdee > 0 ? Math.min((totals.calories / nutritionGoals.tdee) * 100, 100) : 0;
-
-  const macroData = [
-    { name: 'חלבון', value: totals.protein, goal: nutritionGoals.protein, fill: '#3b82f6', colorClass: 'bg-primary-500' },
-    { name: 'פחמימות', value: totals.carbs, goal: nutritionGoals.carbs, fill: '#10b981', colorClass: 'bg-emerald-500' },
-    { name: 'שומן', value: totals.fat, goal: nutritionGoals.fat, fill: '#f59e0b', colorClass: 'bg-amber-500' },
-  ];
-  
-  const today = new Date().toLocaleDateString('en-CA');
-  const isToday = selectedDate === today;
-
-  const handleDateChange = (days: number) => {
-    const currentDate = new Date(selectedDate + 'T00:00:00');
-    currentDate.setDate(currentDate.getDate() + days);
-    onDateChange(currentDate.toLocaleDateString('en-CA'));
-  };
-
   return (
     <div className="space-y-6">
-      <Card>
-        <div className="p-6">
-            <div className="flex justify-between items-center mb-4">
-              <button onClick={() => handleDateChange(-1)} className="p-2 rounded-full hover:bg-slate-100 transition-colors" aria-label="היום הקודם">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
-              </button>
-              <h2 className="text-2xl font-bold text-slate-800">{formatDateDisplay(selectedDate)}</h2>
-              <button onClick={() => handleDateChange(1)} disabled={isToday} className="p-2 rounded-full hover:bg-slate-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" aria-label="היום הבא">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
-              </button>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <StatCard title="יעד קלורי" value={nutritionGoals.tdee} unit="קל'" />
-                <StatCard title="נצרך" value={totals.calories.toFixed(0)} unit="קל'" />
-                <StatCard title="נותר" value={caloriesRemaining.toFixed(0)} unit="קל'" />
-                <StatCard title="BMI" value={nutritionGoals.bmi} unit="" />
-            </div>
-            <div className="mt-6">
-                <div className="flex justify-between items-baseline mb-1">
-                  <p className="text-sm text-slate-500">התקדמות קלורית</p>
-                  <p className="text-sm font-semibold text-primary-600">{calorieProgress.toFixed(0)}%</p>
-                </div>
-                <div className="w-full bg-slate-200 rounded-full h-5 relative">
-                    <div 
-                        className="bg-primary-500 h-5 rounded-full transition-all duration-500 flex items-center justify-center text-white text-xs font-bold" 
-                        style={{ width: `${calorieProgress}%` }}>
-                    </div>
-                     <span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-white mix-blend-lighten">
-                        {totals.calories.toFixed(0)} / {nutritionGoals.tdee}
-                    </span>
-                </div>
-            </div>
-        </div>
-      </Card>
-
-      <div className="grid md:grid-cols-2 gap-6">
-        <Card>
-          <div className="p-6">
-            <h3 className="text-xl font-semibold text-slate-800 mb-4">מאקרו-נוטריינטים (גרם)</h3>
-            <div style={{width: '100%', height: 250}}>
-              <ResponsiveContainer>
-                <PieChart>
-                  <Pie data={macroData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} label={({ name, value }) => `${name}: ${value.toFixed(0)}g`}>
-                    {macroData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
-                  </Pie>
-                   <Tooltip formatter={(value, name) => [`${(value as number).toFixed(0)} / ${macroData.find(d => d.name === name)?.goal}g`, name]}/>
-                   <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="mt-6 space-y-4">
-               {macroData.map(macro => (
-                 <MacroProgressBar
-                   key={macro.name}
-                   name={macro.name}
-                   value={macro.value}
-                   goal={macro.goal}
-                   color={macro.colorClass}
-                 />
-               ))}
-            </div>
-          </div>
-        </Card>
-
-        <Card>
-            <div className="p-6">
-                <h3 className="text-xl font-semibold text-slate-800 mb-4">הוספת ארוחה</h3>
-                <p className="text-slate-500 mb-6">הוסף את הארוחה שלך בצורה ידנית או בעזרת המצלמה.</p>
-                <div className="flex flex-col sm:flex-row gap-4">
-                    <button onClick={() => onOpenModal('manual')} disabled={!isToday || !isAiEnabled} className="w-full flex items-center justify-center gap-2 p-3 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition font-semibold disabled:bg-slate-300 disabled:cursor-not-allowed">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h.01"/><path d="M11 6.16A5.84 5.84 0 0 0 11 12a6 6 0 0 0 6 6h.01"/><path d="M12 12a6 6 0 0 1 6-6h.01"/><path d="M6 12a6 6 0 0 1 6-6h.01"/><path d="M17.84 18a5.84 5.84 0 0 0 0-11.68"/><path d="M12 6a6 6 0 0 0-6 6h.01"/></svg>
-                        הוספה ידנית
-                    </button>
-                    <button onClick={() => onOpenModal('image')} disabled={!isToday || !isAiEnabled} className="w-full flex items-center justify-center gap-2 p-3 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition font-semibold disabled:bg-slate-300 disabled:cursor-not-allowed">
-                       <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
-                        זיהוי מתמונה
-                    </button>
-                </div>
-                 {!isAiEnabled && (
-                    <div className="mt-4 p-4 bg-amber-50 text-amber-900 rounded-lg">
-                        <p className="font-bold">תכונות ה-AI מושבתות.</p>
-                        <p className="text-sm mt-1">כדי להפעילן, יש להגדיר מפתח API של Gemini בסביבת הפרויקט.</p>
-                    </div>
-                )}
-                {isAiEnabled && !isToday && <p className="text-center text-sm text-slate-500 mt-4">ניתן להוסיף אוכל רק עבור היום הנוכחי.</p>}
-            </div>
-        </Card>
-      </div>
-
-      <Card>
-        <div className="p-6">
-          <h3 className="text-xl font-semibold text-slate-800 mb-4">יומן אכילה</h3>
-          {foodLog.length > 0 ? (
-            <ul className="space-y-3">
-              {foodLog.map((item, index) => (
-                <li key={index} className="flex items-center justify-between p-3 bg-slate-100 rounded-lg">
-                    <div>
-                        <p className="font-semibold text-slate-700">{item.name}</p>
-                        <p className="text-sm text-slate-500">
-                            {item.calories.toFixed(0)} קל' &bull; {item.protein.toFixed(0)}ח &bull; {item.carbs.toFixed(0)}פ &bull; {item.fat.toFixed(0)}ש
-                        </p>
-                    </div>
-                    <button onClick={() => onRemoveFoodItem(index)} disabled={!isToday} className="text-red-500 hover:text-red-700 p-1 disabled:text-slate-400 disabled:cursor-not-allowed">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                    </button>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-center text-slate-500 py-4">
-              {isToday ? "עדיין לא הוספת שום דבר היום." : `לא נרשם אוכל בתאריך זה.`}
-            </p>
-          )}
-        </div>
-      </Card>
+       <NutritionSummary goals={nutritionGoals} consumed={consumedTotals} />
+       
+       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <button onClick={() => setModal('image')} className="flex items-center justify-center gap-3 p-4 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition font-semibold">
+                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+                 הוספה מתמונה
+            </button>
+            <button onClick={() => setModal('manual')} className="flex items-center justify-center gap-3 p-4 bg-slate-700 text-white rounded-lg hover:bg-slate-800 transition font-semibold">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                הוספה ידנית
+            </button>
+       </div>
+       
+       <FoodLog items={foodLog} onRemove={onRemoveFood} />
     </div>
   );
 };
