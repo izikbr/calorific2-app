@@ -8,7 +8,8 @@ import { getNutritionInfoFromText } from '../services/apiService';
 interface ManualLogModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onLog: (items: Omit<FoodItem, 'id' | 'timestamp'>[]) => void;
+  // FIX: Updated prop type to match the data structure from apiService.
+  onLog: (items: Omit<FoodItem, 'id'>[]) => void;
   ai: GoogleGenAI;
 }
 

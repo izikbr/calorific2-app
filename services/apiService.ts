@@ -14,7 +14,7 @@ const fileToGenerativePart = async (file: File) => {
   };
 };
 
-export const getFoodFromImage = async (ai: GoogleGenAI, imageFile: File): Promise<FoodItem[]> => {
+export const getFoodFromImage = async (ai: GoogleGenAI, imageFile: File): Promise<Omit<FoodItem, 'id'>[]> => {
   try {
     const imagePart = await fileToGenerativePart(imageFile);
     
@@ -66,7 +66,7 @@ export const getFoodFromImage = async (ai: GoogleGenAI, imageFile: File): Promis
 };
 
 
-export const getNutritionInfoFromText = async (ai: GoogleGenAI, query: string): Promise<FoodItem | null> => {
+export const getNutritionInfoFromText = async (ai: GoogleGenAI, query: string): Promise<Omit<FoodItem, 'id'> | null> => {
   try {
     const prompt = `
       Analyze the following food description: "${query}".

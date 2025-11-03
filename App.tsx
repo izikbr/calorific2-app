@@ -1,156 +1,139 @@
-import React, { useState, useMemo } from 'react';
-import { GoogleGenAI } from "@google/genai";
+import React, { useState, useMemo, useEffect } from 'react';
+import { GoogleGenAI } from '@google/genai';
+import { UserProfile, FoodItem, WeightEntry } from './types';
 import useLocalStorage from './hooks/useLocalStorage';
-import { UserProfile, FoodItem } from './types';
-import Onboarding from './components/Onboarding';
-import UserSelection from './components/UserSelection';
-import Dashboard from './components/Dashboard';
+import { v4 as uuidv4 } from 'uuid';
+
 import Header from './components/Header';
 import Footer from './components/common/Footer';
+import UserSelection from './components/UserSelection';
+import Onboarding from './components/Onboarding';
+import Dashboard from './components/Dashboard';
 
-// FIX: Initialized the main App component to manage state and render views.
+// Per instructions, API_KEY is assumed to be in the environment.
+const ai = new GoogleGenAI({apiKey: process.env.API_KEY!});
+
 const App: React.FC = () => {
-  const [profiles, setProfiles] = useLocalStorage<UserProfile[]>('calorific-profiles', []);
-  const [currentProfileId, setCurrentProfileId] = useLocalStorage<string | null>('calorific-current-profile', null);
-  const [foodLogs, setFoodLogs] = useLocalStorage<Record<string, FoodItem[]>>('calorific-food-logs', {});
-  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [allProfiles, setAllProfiles] = useLocalStorage<UserProfile[]>('calorific-profiles', []);
+  const [activeProfileId, setActiveProfileId] = useLocalStorage<string | null>('calorific-active-profile-id', null);
+  const [appState, setAppState] = useState<'LOADING' | 'SELECT_PROFILE' | 'ONBOARDING' | 'DASHBOARD'>('LOADING');
 
-  // Initialize Gemini AI client
-  const ai = useMemo(() => {
-    if (process.env.API_KEY) {
-      return new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const activeProfile = useMemo(() => {
+    return allProfiles.find(p => p.id === activeProfileId) || null;
+  }, [allProfiles, activeProfileId]);
+
+  useEffect(() => {
+    if (activeProfile) {
+      setAppState('DASHBOARD');
+    } else if (appState !== 'ONBOARDING') { // Don't interrupt onboarding
+      setAppState('SELECT_PROFILE');
     }
-    console.error("API_KEY environment variable not set.");
-    return null;
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeProfile]);
 
-  const currentProfile = useMemo(() => {
-    return profiles.find(p => p.id === currentProfileId) || null;
-  }, [profiles, currentProfileId]);
-
-  const currentFoodLog = useMemo(() => {
-    if (!currentProfileId) return [];
-    return foodLogs[currentProfileId] || [];
-  }, [foodLogs, currentProfileId]);
-
-  const handleCreateProfile = (profileData: Omit<UserProfile, 'id'>) => {
-    const newProfile: UserProfile = {
-      ...profileData,
-      id: `user_${new Date().getTime()}`,
-    };
-    const updatedProfiles = [...profiles, newProfile];
-    setProfiles(updatedProfiles);
-    setCurrentProfileId(newProfile.id);
-    setShowOnboarding(false);
-  };
-
-  const handleUpdateProfile = (updates: Partial<UserProfile>) => {
-    if (!currentProfileId) return;
-    setProfiles(prevProfiles =>
-      prevProfiles.map(p =>
-        p.id === currentProfileId ? { ...p, ...updates } : p
-      )
-    );
-  };
-  
-  const handleDeleteProfile = (id: string) => {
-    if (window.confirm('Are you sure you want to delete this profile and all its data?')) {
-      setProfiles(profiles.filter(p => p.id !== id));
-      if (currentProfileId === id) {
-        setCurrentProfileId(null);
-      }
-      // Also delete associated food log
-      const newFoodLogs = {...foodLogs};
-      delete newFoodLogs[id];
-      setFoodLogs(newFoodLogs);
-    }
-  };
 
   const handleSelectProfile = (id: string) => {
-    setCurrentProfileId(id);
+    setActiveProfileId(id);
   };
 
   const handleLogout = () => {
-    setCurrentProfileId(null);
+    setActiveProfileId(null);
   };
-  
+
   const handleNewProfile = () => {
-      setShowOnboarding(true);
-  };
-  
-  const handleLogFood = (items: Omit<FoodItem, 'id'>[]) => {
-      if (!currentProfileId) return;
-
-      const newItems: FoodItem[] = items.map(item => ({
-        ...item,
-        id: `food_${new Date().getTime()}_${Math.random()}`,
-        timestamp: new Date().toISOString(),
-      }));
-
-      setFoodLogs(prevLogs => ({
-          ...prevLogs,
-          [currentProfileId]: [...(prevLogs[currentProfileId] || []), ...newItems]
-      }));
+    setAppState('ONBOARDING');
   };
 
-  const handleDeleteFoodItem = (itemId: string) => {
-      if(!currentProfileId) return;
-      setFoodLogs(prevLogs => ({
-          ...prevLogs,
-          [currentProfileId]: prevLogs[currentProfileId].filter(item => item.id !== itemId)
-      }));
+  const handleDeleteProfile = (id: string) => {
+    if (window.confirm('האם אתה בטוח שברצונך למחוק פרופיל זה? לא ניתן לשחזר פעולה זו.')) {
+        setAllProfiles(prev => prev.filter(p => p.id !== id));
+        if (activeProfileId === id) {
+            setActiveProfileId(null);
+        }
+    }
+  };
+
+  const handleOnboardingComplete = (profileData: Omit<UserProfile, 'id'>) => {
+    const newProfile: UserProfile = {
+      ...profileData,
+      id: uuidv4(),
+      foodLog: [],
+      weightLog: [{ date: new Date().toISOString().split('T')[0], weight: profileData.weight }],
+    };
+    setAllProfiles(prev => [...prev, newProfile]);
+    setActiveProfileId(newProfile.id);
+    setAppState('DASHBOARD');
+  };
+
+  const handleProfileUpdate = (updatedData: Partial<UserProfile>) => {
+    setAllProfiles(prev => prev.map(p => {
+      if (p.id === activeProfileId) {
+        return { ...p, ...updatedData };
+      }
+      return p;
+    }));
+  };
+
+  const handleFoodLogUpdate = (newFoodLog: FoodItem[]) => {
+      handleProfileUpdate({ foodLog: newFoodLog });
   };
   
-  const handleUpdateFoodItem = (updatedItem: FoodItem) => {
-       if(!currentProfileId) return;
-       setFoodLogs(prevLogs => ({
-           ...prevLogs,
-           [currentProfileId]: prevLogs[currentProfileId].map(item => item.id === updatedItem.id ? updatedItem : item)
-       }));
+  const handleAddWeight = (date: string, weight: number) => {
+    const currentProfile = allProfiles.find(p => p.id === activeProfileId);
+    if (!currentProfile) return;
+
+    const newLogEntry: WeightEntry = { date, weight };
+    let updatedWeightLog = [...(currentProfile.weightLog || [])];
+    
+    const existingLogIndex = updatedWeightLog.findIndex(log => log.date === date);
+
+    if (existingLogIndex !== -1) {
+      updatedWeightLog[existingLogIndex] = newLogEntry;
+    } else {
+      updatedWeightLog.push(newLogEntry);
+    }
+
+    updatedWeightLog.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    // Also update the main profile weight if it's for today
+    const today = new Date().toISOString().split('T')[0];
+    const newProfileData: Partial<UserProfile> = { weightLog: updatedWeightLog };
+    if (date === today) {
+      newProfileData.weight = weight;
+    }
+
+    handleProfileUpdate(newProfileData);
   };
-  
-  if (!ai) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-          <div className="text-center p-6 bg-white rounded-lg shadow-md">
-              <h1 className="text-2xl font-bold text-red-600">Configuration Error</h1>
-              <p className="text-slate-600 mt-2">The Gemini API key is missing. Please set the API_KEY environment variable.</p>
-          </div>
-      </div>
-    );
-  }
 
   const renderContent = () => {
-    if (currentProfile) {
-      return (
-        <Dashboard
-          userProfile={currentProfile}
-          onUpdateProfile={handleUpdateProfile}
-          foodLog={currentFoodLog}
-          onLogFood={handleLogFood}
-          onDeleteFoodItem={handleDeleteFoodItem}
-          onUpdateFoodItem={handleUpdateFoodItem}
-          ai={ai}
-        />
-      );
+    switch (appState) {
+      case 'SELECT_PROFILE':
+        return <UserSelection profiles={allProfiles} onSelectProfile={handleSelectProfile} onDeleteProfile={handleDeleteProfile} onNewProfile={handleNewProfile} />;
+      case 'ONBOARDING':
+        return <Onboarding onComplete={handleOnboardingComplete} />;
+      case 'DASHBOARD':
+        if (activeProfile) {
+          return <Dashboard 
+            userProfile={activeProfile} 
+            onUpdateProfile={handleProfileUpdate} 
+            onUpdateFoodLog={handleFoodLogUpdate} 
+            onAddWeight={handleAddWeight}
+            ai={ai}
+          />;
+        }
+        // Fallback if state is out of sync
+        handleLogout();
+        return null;
+      case 'LOADING':
+      default:
+        return <div className="text-center p-10"><h1 className="text-xl font-semibold">טוען...</h1></div>;
     }
-    if (showOnboarding || profiles.length === 0) {
-      return <Onboarding onComplete={handleCreateProfile} />;
-    }
-    return (
-        <UserSelection 
-            profiles={profiles} 
-            onSelectProfile={handleSelectProfile} 
-            onDeleteProfile={handleDeleteProfile}
-            onNewProfile={handleNewProfile}
-        />
-    );
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans flex flex-col">
-      <Header userProfile={currentProfile} onLogout={handleLogout} />
-      <main className="flex-grow container mx-auto p-4 max-w-4xl">
+    <div className="flex flex-col min-h-screen bg-slate-50" dir="rtl">
+      <Header userProfile={activeProfile} onLogout={handleLogout} />
+      <main className="flex-grow w-full max-w-4xl mx-auto p-4 sm:p-6">
         {renderContent()}
       </main>
       <Footer />
