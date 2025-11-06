@@ -1,3 +1,4 @@
+
 // FIX: Implemented the EditFoodItemModal to allow editing food log entries.
 import React, { useState, useEffect } from 'react';
 import { FoodItem } from '../types';
@@ -55,19 +56,19 @@ const EditFoodItemModal: React.FC<EditFoodItemModalProps> = ({ isOpen, onClose, 
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-slate-600 mb-1">קלוריות</label>
-                <input type="number" name="calories" value={formData.calories} onChange={handleChange} className="w-full p-2 border border-slate-300 rounded-md" required step="1" />
+                <input type="number" name="calories" value={formData.calories} onChange={handleChange} className="w-full p-2 border border-slate-300 rounded-md" required step="1" inputMode="numeric" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-600 mb-1">חלבון (ג)</label>
-                <input type="number" name="protein" value={formData.protein} onChange={handleChange} className="w-full p-2 border border-slate-300 rounded-md" required step="0.1" />
+                <input type="number" name="protein" value={formData.protein} onChange={handleChange} className="w-full p-2 border border-slate-300 rounded-md" required step="any" inputMode="decimal" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-600 mb-1">פחמימות (ג)</label>
-                <input type="number" name="carbs" value={formData.carbs} onChange={handleChange} className="w-full p-2 border border-slate-300 rounded-md" required step="0.1" />
+                <input type="number" name="carbs" value={formData.carbs} onChange={handleChange} className="w-full p-2 border border-slate-300 rounded-md" required step="any" inputMode="decimal" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-600 mb-1">שומן (ג)</label>
-                <input type="number" name="fat" value={formData.fat} onChange={handleChange} className="w-full p-2 border border-slate-300 rounded-md" required step="0.1" />
+                <input type="number" name="fat" value={formData.fat} onChange={handleChange} className="w-full p-2 border border-slate-300 rounded-md" required step="any" inputMode="decimal" />
               </div>
             </div>
             <div className="mt-6 flex justify-end gap-3">

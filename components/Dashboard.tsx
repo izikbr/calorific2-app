@@ -1,3 +1,4 @@
+
 import React, { useMemo, useState, useEffect } from 'react';
 import { GoogleGenAI } from '@google/genai';
 import { v4 as uuidv4 } from 'uuid';
@@ -293,7 +294,8 @@ const Dashboard: React.FC<DashboardProps> = ({ userProfile, onUpdateProfile, onU
                         <form onSubmit={handleWeightSubmit} className="flex gap-2 mb-4">
                             <input 
                                 type="number" 
-                                step="0.1"
+                                step="any"
+                                inputMode="decimal"
                                 value={currentWeightInput}
                                 onChange={(e) => setCurrentWeightInput(e.target.value)}
                                 placeholder="הזן משקל עדכני (ק״ג)"

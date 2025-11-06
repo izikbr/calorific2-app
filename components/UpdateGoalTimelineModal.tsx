@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { UserProfile, Goal } from '../types';
 import Card from './common/Card';
@@ -47,6 +48,7 @@ const UpdateGoalTimelineModal: React.FC<UpdateGoalTimelineModalProps> = ({ isOpe
                 required 
                 min="1"
                 step="1"
+                inputMode="numeric"
               />
             </div>
             <div className="mt-6 flex justify-end gap-3">
