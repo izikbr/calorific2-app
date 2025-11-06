@@ -13,6 +13,7 @@ import QuickAddModal from './QuickAddModal';
 import UpdateProfileModal from './UpdateProfileModal';
 import EditFoodItemModal from './EditFoodItemModal';
 import UpdateGoalTimelineModal from './UpdateGoalTimelineModal';
+import AppleHealthInfoModal from './AppleHealthInfoModal';
 
 interface DashboardProps {
   userProfile: UserProfile;
@@ -38,7 +39,7 @@ const formatDateDisplay = (dateStr: string) => {
 };
 
 const Dashboard: React.FC<DashboardProps> = ({ userProfile, onUpdateProfile, onUpdateFoodLog, onAddWeight, ai }) => {
-  const [activeModal, setActiveModal] = useState<null | 'image' | 'manual' | 'quickAdd' | 'updateProfile' | 'updateTimeline' | 'editFoodItem'>(null);
+  const [activeModal, setActiveModal] = useState<null | 'image' | 'manual' | 'quickAdd' | 'updateProfile' | 'updateTimeline' | 'editFoodItem' | 'appleHealth'>(null);
   const [editingFoodItem, setEditingFoodItem] = useState<FoodItem | null>(null);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [currentWeightInput, setCurrentWeightInput] = useState<string>('');
@@ -334,6 +335,13 @@ const Dashboard: React.FC<DashboardProps> = ({ userProfile, onUpdateProfile, onU
                     </button>
                 </div>
             </Card>
+            <Card>
+                <div className="p-4">
+                     <button onClick={() => setActiveModal('appleHealth')} className="w-full text-center p-3 text-slate-600 font-semibold hover:bg-slate-100 rounded-md transition">
+                        איך הופכים לאפליקציית iOS?
+                    </button>
+                </div>
+            </Card>
         </div>
       </div>
 
@@ -343,6 +351,7 @@ const Dashboard: React.FC<DashboardProps> = ({ userProfile, onUpdateProfile, onU
       <QuickAddModal isOpen={activeModal === 'quickAdd'} onClose={() => setActiveModal(null)} onLog={handleLogItems} />
       <UpdateProfileModal isOpen={activeModal === 'updateProfile'} onClose={() => setActiveModal(null)} onUpdate={onUpdateProfile} userProfile={userProfile} />
       <UpdateGoalTimelineModal isOpen={activeModal === 'updateTimeline'} onClose={() => setActiveModal(null)} onUpdate={onUpdateProfile} userProfile={userProfile} />
+      <AppleHealthInfoModal isOpen={activeModal === 'appleHealth'} onClose={() => setActiveModal(null)} />
       {editingFoodItem && <EditFoodItemModal isOpen={true} onClose={() => setEditingFoodItem(null)} onUpdate={handleUpdateItem} foodItem={editingFoodItem} />}
     </div>
   );

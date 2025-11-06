@@ -80,15 +80,15 @@ const UpdateProfileModal: React.FC<UpdateProfileModalProps> = ({ isOpen, onClose
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-600 mb-1">גיל</label>
-                  <input type="number" name="age" value={formData.age || ''} onChange={handleChange} className="w-full p-2 border border-slate-300 rounded-md focus:ring-primary-500 focus:border-primary-500" required min="1" />
+                  <input type="number" name="age" value={formData.age || ''} onChange={handleChange} className="w-full p-2 border border-slate-300 rounded-md focus:ring-primary-500 focus:border-primary-500" required min="1" step="1" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-600 mb-1">גובה (ס"מ)</label>
-                  <input type="number" name="height" value={formData.height || ''} onChange={handleChange} className="w-full p-2 border border-slate-300 rounded-md focus:ring-primary-500 focus:border-primary-500" required min="1" />
+                  <input type="number" name="height" value={formData.height || ''} onChange={handleChange} className="w-full p-2 border border-slate-300 rounded-md focus:ring-primary-500 focus:border-primary-500" required min="1" step="0.1" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-600 mb-1">משקל נוכחי (ק"ג)</label>
-                  <input type="number" name="weight" value={formData.weight || ''} onChange={handleChange} className="w-full p-2 border border-slate-300 rounded-md focus:ring-primary-500 focus:border-primary-500" required min="1" />
+                  <input type="number" name="weight" value={formData.weight || ''} onChange={handleChange} className="w-full p-2 border border-slate-300 rounded-md focus:ring-primary-500 focus:border-primary-500" required min="1" step="0.1" />
                 </div>
             </div>
 
@@ -99,7 +99,7 @@ const UpdateProfileModal: React.FC<UpdateProfileModalProps> = ({ isOpen, onClose
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-600 mb-1">משקל יעד (ק"ג)</label>
-                  <input type="number" name="targetWeight" value={formData.targetWeight || ''} onChange={handleChange} className="w-full p-2 border border-slate-300 rounded-md focus:ring-primary-500 focus:border-primary-500" required min="1" />
+                  <input type="number" name="targetWeight" value={formData.targetWeight || ''} onChange={handleChange} className="w-full p-2 border border-slate-300 rounded-md focus:ring-primary-500 focus:border-primary-500" required min="1" step="0.1" />
                 </div>
                 <div>
                     <label className="block text-sm font-medium text-slate-600 mb-1">המטרה שלי</label>
@@ -123,7 +123,7 @@ const UpdateProfileModal: React.FC<UpdateProfileModalProps> = ({ isOpen, onClose
             {formData.goal === Goal.Lose && (
               <div>
                 <label className="block text-sm font-medium text-slate-600 mb-1">בכמה שבועות תרצה להגיע למשקל היעד?</label>
-                <input type="number" name="loseWeightWeeks" value={formData.loseWeightWeeks || ''} onChange={handleChange} className="w-full p-2 border border-slate-300 rounded-md focus:ring-primary-500 focus:border-primary-500" required min="1" />
+                <input type="number" name="loseWeightWeeks" value={formData.loseWeightWeeks || ''} onChange={handleChange} className="w-full p-2 border border-slate-300 rounded-md focus:ring-primary-500 focus:border-primary-500" required min="1" step="1" />
               </div>
             )}
             <div className="mt-6 flex justify-end gap-3">

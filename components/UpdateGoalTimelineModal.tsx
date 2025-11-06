@@ -45,7 +45,8 @@ const UpdateGoalTimelineModal: React.FC<UpdateGoalTimelineModalProps> = ({ isOpe
                 onChange={(e) => setWeeks(Number(e.target.value))} 
                 className="w-full p-2 border border-slate-300 rounded-md focus:ring-primary-500 focus:border-primary-500" 
                 required 
-                min="1" 
+                min="1"
+                step="1"
               />
             </div>
             <div className="mt-6 flex justify-end gap-3">
