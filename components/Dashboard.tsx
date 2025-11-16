@@ -415,13 +415,13 @@ const Dashboard: React.FC<DashboardProps> = ({ userProfile, onUpdateProfile, onU
                               <LineChart data={chartData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
                                   <CartesianGrid strokeDasharray="3 3" />
                                   <XAxis dataKey="date" tickFormatter={(dateStr) => new Date(dateStr).toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit'})} />
-                                  <YAxis yAxisId="left" stroke="#0284c7" label={{ value: 'משקל (ק"ג)', angle: -90, position: 'insideLeft', fill: '#0284c7' }} domain={['dataMin - 2', 'dataMax + 2']} />
-                                  <YAxis yAxisId="right" orientation="right" stroke="#16a34a" label={{ value: 'קלוריות', angle: -90, position: 'insideRight', fill: '#16a34a' }} />
+                                  <YAxis yAxisId="left" stroke="#0284c7" label={{ value: 'משקל (ק"ג)', angle: -90, position: 'insideLeft', fill: '#0284c7' }} domain={['dataMin - 2', 'dataMax + 2']} allowDecimals={false} />
+                                  <YAxis yAxisId="right" orientation="right" stroke="#16a34a" label={{ value: 'קלוריות', angle: -90, position: 'insideRight', fill: '#16a34a' }} domain={[0, 'dataMax + 500']} />
                                   <Tooltip formatter={(value, name) => [value, name === 'weight' ? 'משקל' : 'קלוריות']} labelFormatter={(label) => new Date(label).toLocaleDateString('he-IL')}/>
                                   <Legend wrapperStyle={{fontSize: '14px'}} />
                                   <ReferenceLine y={userProfile.targetWeight} yAxisId="left" label={{ value: 'יעד', position: 'insideTopLeft' }} stroke="#ef4444" strokeDasharray="3 3" />
-                                  <Line yAxisId="left" type="monotone" dataKey="weight" stroke="#0ea5e9" strokeWidth={3} name="משקל" dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                                  <Line yAxisId="right" type="monotone" dataKey="calories" stroke="#22c55e" strokeWidth={2} name="קלוריות" />
+                                  <Line connectNulls yAxisId="left" type="monotone" dataKey="weight" stroke="#0ea5e9" strokeWidth={3} name="משקל" dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                                  <Line connectNulls yAxisId="right" type="monotone" dataKey="calories" stroke="#22c55e" strokeWidth={2} name="קלוריות" />
                               </LineChart>
                           </ResponsiveContainer>
                        ) : (

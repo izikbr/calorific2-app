@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 
 interface BmiChartProps {
@@ -28,36 +29,36 @@ const BmiChart: React.FC<BmiChartProps> = ({ bmi }) => {
 
   return (
     <div className="p-6">
-      <h3 className="text-xl font-bold text-slate-800 mb-6">מדד מסת הגוף (BMI)</h3>
-      <div className="relative w-full pt-10">
+      <h3 className="text-xl font-bold text-slate-800 mb-4">מדד מסת הגוף (BMI)</h3>
+      <div className="relative w-full mt-8">
         {/* User's BMI Indicator */}
         <div
           className="absolute z-10 text-center transition-all duration-500 ease-out"
-          style={{ left: `${userBmiPosition}%`, transform: 'translateX(-50%)', bottom: 'calc(100% - 30px)' }}
+          style={{ left: `${userBmiPosition}%`, transform: 'translateX(-50%)', top: '-35px' }}
         >
           <span className="text-sm font-bold text-primary-600 bg-white px-2 py-1 rounded-md shadow-lg whitespace-nowrap">ה-BMI שלך: {bmi.toFixed(1)}</span>
           <div className="w-0 h-0 border-l-8 border-l-transparent border-r-8 border-r-transparent border-t-8 border-t-primary-600 mx-auto mt-1"></div>
         </div>
 
-        {/* BMI Scale Bar */}
-        <div className="flex h-5 rounded-full overflow-hidden shadow-inner bg-slate-100">
-          {categories.map((cat) => {
-            const width = ((cat.end - lastEnd) / range) * 100;
-            lastEnd = cat.end;
-            return (
-              <div key={cat.name} className={`${cat.color}`} style={{ width: `${width}%` }}></div>
-            );
-          })}
-        </div>
+        {/* BMI Scale Bar and Labels */}
+        <div>
+            <div className="flex h-5 rounded-full overflow-hidden shadow-inner bg-slate-100">
+            {categories.map((cat) => {
+                const width = ((cat.end - lastEnd) / range) * 100;
+                lastEnd = cat.end;
+                return (
+                <div key={cat.name} className={`${cat.color}`} style={{ width: `${width}%` }}></div>
+                );
+            })}
+            </div>
 
-        {/* Labels for scale */}
-        <div className="relative h-4">
-          <span style={{ transform: 'translateX(-50%)', left: `${getPositionPercentage(18.5)}%`}} className="absolute text-xs text-slate-500">18.5</span>
-          <span style={{ transform: 'translateX(-50%)', left: `${getPositionPercentage(25)}%`}} className="absolute text-xs text-slate-500">25</span>
-          <span style={{ transform: 'translateX(-50%)', left: `${getPositionPercentage(30)}%`}} className="absolute text-xs text-slate-500">30</span>
+            <div className="relative h-4 mt-1">
+            <span style={{ transform: 'translateX(-50%)', left: `${getPositionPercentage(18.5)}%`}} className="absolute text-xs text-slate-500">18.5</span>
+            <span style={{ transform: 'translateX(-50%)', left: `${getPositionPercentage(25)}%`}} className="absolute text-xs text-slate-500">25</span>
+            <span style={{ transform: 'translateX(-50%)', left: `${getPositionPercentage(30)}%`}} className="absolute text-xs text-slate-500">30</span>
+            </div>
         </div>
-
-        {/* Labels for categories */}
+        
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-2 mt-4 text-center text-sm">
             {categories.map(cat => (
                 <div key={cat.name} className="flex items-center justify-center gap-2">
