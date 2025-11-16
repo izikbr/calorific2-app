@@ -14,7 +14,6 @@ import QuickAddModal from './QuickAddModal';
 import UpdateProfileModal from './UpdateProfileModal';
 import EditFoodItemModal from './EditFoodItemModal';
 import UpdateGoalTimelineModal from './UpdateGoalTimelineModal';
-import AppleHealthInfoModal from './AppleHealthInfoModal';
 import BmiChart from './BmiChart';
 
 interface DashboardProps {
