@@ -1,4 +1,5 @@
 
+
 import React, { useMemo, useState, useEffect } from 'react';
 import { GoogleGenAI } from '@google/genai';
 import { v4 as uuidv4 } from 'uuid';
@@ -122,6 +123,41 @@ const Dashboard: React.FC<DashboardProps> = ({ userProfile, onUpdateProfile, onU
 
     return Object.values(combinedData).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [userProfile.weightLog, userProfile.foodLog]);
+  
+  const { startingWeight, weightToGo, progressPercentage, weightChange } = useMemo(() => {
+    const sortedWeightLog = [...(userProfile.weightLog || [])].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const startWeight = sortedWeightLog[0]?.weight ?? userProfile.weight;
+    const currentWeight = userProfile.weight;
+    const targetWeight = userProfile.targetWeight;
+    
+    let toGo = 0;
+    let progress = 0;
+
+    if (userProfile.goal === Goal.Lose) {
+        toGo = currentWeight - targetWeight;
+        const totalToLose = startWeight - targetWeight;
+        if (totalToLose > 0) {
+            progress = ((startWeight - currentWeight) / totalToLose) * 100;
+        } else if (toGo <= 0) {
+            progress = 100;
+        }
+    } else if (userProfile.goal === Goal.Gain) {
+        toGo = targetWeight - currentWeight;
+        const totalToGain = targetWeight - startWeight;
+        if (totalToGain > 0) {
+            progress = ((currentWeight - startWeight) / totalToGain) * 100;
+        } else if (toGo <= 0) {
+            progress = 100;
+        }
+    }
+
+    return {
+        startingWeight: startWeight,
+        weightToGo: toGo,
+        progressPercentage: Math.max(0, Math.min(100, progress)),
+        weightChange: currentWeight - startWeight,
+    };
+  }, [userProfile.weight, userProfile.targetWeight, userProfile.weightLog, userProfile.goal]);
 
 
   const handleLogItems = (items: Omit<FoodItem, 'id'>[]) => {
@@ -290,58 +326,115 @@ const Dashboard: React.FC<DashboardProps> = ({ userProfile, onUpdateProfile, onU
                     </div>
                 </div>
             </Card>
+            
             <Card>
-                <div className="p-6">
-                    <h3 className="text-xl font-bold text-slate-800 mb-4">מגמות ומשקל</h3>
-                     {isToday && (
-                        <form onSubmit={handleWeightSubmit} className="flex gap-2 mb-4">
-                            <input 
-                                type="number" 
-                                step="any"
-                                inputMode="decimal"
-                                value={currentWeightInput}
-                                onChange={(e) => setCurrentWeightInput(e.target.value)}
-                                placeholder="הזן משקל עדכני (ק״ג)"
-                                className="flex-grow p-2 border border-slate-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
-                            />
-                            <button type="submit" className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition">שמור</button>
-                        </form>
-                    )}
-                    {weightSaved && <p className="text-sm text-green-600 mb-4 -mt-2">נשמר!</p>}
-
-                    <div className="h-64">
-                         {chartData.length > 1 ? (
-                            <ResponsiveContainer width="100%" height="100%">
-                                <LineChart data={chartData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="date" tickFormatter={(dateStr) => new Date(dateStr).toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit'})} />
-                                    <YAxis yAxisId="left" stroke="#0284c7" label={{ value: 'משקל (ק"ג)', angle: -90, position: 'insideLeft', fill: '#0284c7' }} />
-                                    <YAxis yAxisId="right" orientation="right" stroke="#16a34a" label={{ value: 'קלוריות', angle: -90, position: 'insideRight', fill: '#16a34a' }} />
-                                    <Tooltip formatter={(value, name) => [value, name === 'weight' ? 'משקל' : 'קלוריות']} labelFormatter={(label) => new Date(label).toLocaleDateString('he-IL')}/>
-                                    <Legend />
-                                    <ReferenceLine y={userProfile.targetWeight} yAxisId="left" label={{ value: 'יעד', position: 'insideTopLeft' }} stroke="red" strokeDasharray="3 3" />
-                                    <Line yAxisId="left" type="monotone" dataKey="weight" stroke="#0284c7" strokeWidth={2} name="משקל" dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                                    <Line yAxisId="right" type="monotone" dataKey="calories" stroke="#16a34a" strokeWidth={2} name="קלוריות" />
-                                </LineChart>
-                            </ResponsiveContainer>
-                         ) : (
-                            <div className="text-center text-slate-500 pt-12">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mx-auto text-slate-400 mb-2"><path d="M3 3v18h18"/><path d="M18.7 8a5 5 0 0 1-6.4 0l-6.3 6.3"/><path d="M12.3 14.7a5 5 0 0 1 6.4 0"/><path d="M12 18H3"/></svg>
-                                <p>הזן נתונים כדי לראות את המגמות.</p>
-                            </div>
-                         )}
-                    </div>
-                </div>
-            </Card>
-            <Card>
-                <div className="p-4">
-                     <button onClick={() => setActiveModal('updateProfile')} className="w-full text-center p-3 text-primary-600 font-semibold hover:bg-slate-100 rounded-md transition">
-                        עדכן פרופיל
-                    </button>
-                </div>
+              <div className="p-4">
+                   <button onClick={() => setActiveModal('updateProfile')} className="w-full text-center p-3 text-primary-600 font-semibold hover:bg-slate-100 rounded-md transition">
+                      עדכן פרופיל
+                  </button>
+              </div>
             </Card>
         </div>
       </div>
+      
+      <Card>
+          <div className="p-6">
+              <h3 className="text-xl font-bold text-slate-800 mb-6">מעקב התקדמות</h3>
+              <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-start">
+                  
+                  {/* Left side: stats and input */}
+                  <div className="lg:col-span-2 space-y-6">
+                      <div className="grid grid-cols-3 gap-2 sm:gap-4">
+                          <div className="p-3 bg-slate-100 rounded-lg text-center">
+                              <p className="text-xs sm:text-sm text-slate-500 mb-1">נוכחי</p>
+                              <p className="text-lg sm:text-2xl font-bold text-slate-800">{userProfile.weight.toFixed(1)}</p>
+                              <p className="text-xs sm:text-sm text-slate-500">ק״ג</p>
+                          </div>
+                          <div className="p-3 bg-primary-50 rounded-lg text-center">
+                              <p className="text-xs sm:text-sm text-primary-700 mb-1">יעד</p>
+                              <p className="text-lg sm:text-2xl font-bold text-primary-800">{userProfile.targetWeight.toFixed(1)}</p>
+                              <p className="text-xs sm:text-sm text-primary-700">ק״ג</p>
+                          </div>
+                           <div className="p-3 bg-slate-100 rounded-lg text-center">
+                              <p className="text-xs sm:text-sm text-slate-500 mb-1">התחלתי</p>
+                              <p className="text-lg sm:text-2xl font-bold text-slate-800">{startingWeight.toFixed(1)}</p>
+                              <p className="text-xs sm:text-sm text-slate-500">ק״ג</p>
+                          </div>
+                      </div>
+
+                      {userProfile.goal !== Goal.Maintain && (
+                          <div>
+                              <div className="flex justify-between items-baseline mb-1">
+                                  <span className="font-bold text-primary-600">התקדמות ליעד</span>
+                                  <span className="text-sm font-medium text-slate-500">
+                                    {weightToGo > 0 ? `${weightToGo.toFixed(1)} ק״ג נותרו` : 'השגת את היעד!'}
+                                  </span>
+                              </div>
+                              <div className="h-4 bg-slate-200 rounded-full overflow-hidden" role="progressbar" aria-valuenow={progressPercentage} aria-valuemin="0" aria-valuemax="100">
+                                  <div className="h-full bg-primary-500 rounded-full transition-all duration-500 ease-out" style={{ width: `${progressPercentage}%` }}></div>
+                              </div>
+                          </div>
+                      )}
+                      
+                      <div className="text-center text-slate-600 font-medium">
+                          {weightChange !== 0 ? (
+                              <span>
+                                  {weightChange > 0 ? `עליה של ${weightChange.toFixed(1)} ק״ג` : `ירידה של ${Math.abs(weightChange).toFixed(1)} ק״ג`} מההתחלה
+                                  {weightChange * (userProfile.goal === Goal.Gain ? -1 : 1) < 0 ? ' 💪' : ' 🎉'}
+                              </span>
+                          ) : (
+                              <span>בוא נתחיל את המסע! הזן את המשקל שלך.</span>
+                          )}
+                      </div>
+
+                      <form onSubmit={handleWeightSubmit} className="space-y-2">
+                          <label htmlFor="weight-input" className="font-semibold text-slate-700">
+                              {isToday ? 'עדכן משקל יומי' : `הוסף משקל ל-${new Date(selectedDate).toLocaleDateString('he-IL')}`}
+                          </label>
+                          <div className="flex gap-2">
+                              <input 
+                                  id="weight-input"
+                                  type="number" 
+                                  step="any"
+                                  inputMode="decimal"
+                                  value={currentWeightInput}
+                                  onChange={(e) => setCurrentWeightInput(e.target.value)}
+                                  placeholder="משקל בק״ג"
+                                  className="flex-grow p-2 border border-slate-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
+                              />
+                              <button type="submit" className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition disabled:bg-slate-400" disabled={!currentWeightInput}>שמור</button>
+                          </div>
+                          {weightSaved && <p className="text-sm text-green-600">נשמר בהצלחה!</p>}
+                      </form>
+                  </div>
+                  
+                  {/* Right side: chart */}
+                  <div className="lg:col-span-3 min-h-[300px] w-full h-full">
+                       {chartData.length > 1 ? (
+                          <ResponsiveContainer width="100%" height={300}>
+                              <LineChart data={chartData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                                  <CartesianGrid strokeDasharray="3 3" />
+                                  <XAxis dataKey="date" tickFormatter={(dateStr) => new Date(dateStr).toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit'})} />
+                                  <YAxis yAxisId="left" stroke="#0284c7" label={{ value: 'משקל (ק"ג)', angle: -90, position: 'insideLeft', fill: '#0284c7' }} domain={['dataMin - 2', 'dataMax + 2']} />
+                                  <YAxis yAxisId="right" orientation="right" stroke="#16a34a" label={{ value: 'קלוריות', angle: -90, position: 'insideRight', fill: '#16a34a' }} />
+                                  <Tooltip formatter={(value, name) => [value, name === 'weight' ? 'משקל' : 'קלוריות']} labelFormatter={(label) => new Date(label).toLocaleDateString('he-IL')}/>
+                                  <Legend wrapperStyle={{fontSize: '14px'}} />
+                                  <ReferenceLine y={userProfile.targetWeight} yAxisId="left" label={{ value: 'יעד', position: 'insideTopLeft' }} stroke="#ef4444" strokeDasharray="3 3" />
+                                  <Line yAxisId="left" type="monotone" dataKey="weight" stroke="#0ea5e9" strokeWidth={3} name="משקל" dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                                  <Line yAxisId="right" type="monotone" dataKey="calories" stroke="#22c55e" strokeWidth={2} name="קלוריות" />
+                              </LineChart>
+                          </ResponsiveContainer>
+                       ) : (
+                          <div className="flex flex-col items-center justify-center text-center text-slate-500 h-full">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mx-auto text-slate-400 mb-2"><path d="M3 3v18h18"/><path d="M18.7 8a5 5 0 0 1-6.4 0l-6.3 6.3"/><path d="M12.3 14.7a5 5 0 0 1 6.4 0"/><path d="M12 18H3"/></svg>
+                              <p>הזן נתונים כדי לראות את המגמות.</p>
+                          </div>
+                       )}
+                  </div>
+              </div>
+          </div>
+      </Card>
+
       
       <Card>
         <BmiChart bmi={bmi} />
