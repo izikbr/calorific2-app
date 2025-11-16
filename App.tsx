@@ -10,26 +10,45 @@ import UserSelection from './components/UserSelection';
 import Onboarding from './components/Onboarding';
 import Dashboard from './components/Dashboard';
 
-// Per instructions, API_KEY is assumed to be in the environment.
-const ai = new GoogleGenAI({apiKey: process.env.API_KEY!});
-
 const App: React.FC = () => {
   const [allProfiles, setAllProfiles] = useLocalStorage<UserProfile[]>('calorific-profiles', []);
   const [activeProfileId, setActiveProfileId] = useLocalStorage<string | null>('calorific-active-profile-id', null);
-  const [appState, setAppState] = useState<'LOADING' | 'SELECT_PROFILE' | 'ONBOARDING' | 'DASHBOARD'>('LOADING');
+  const [appState, setAppState] = useState<'LOADING' | 'SELECT_PROFILE' | 'ONBOARDING' | 'DASHBOARD' | 'ERROR'>('LOADING');
+  const [errorMessage, setErrorMessage] = useState<string>('');
+  const [ai, setAi] = useState<GoogleGenAI | null>(null);
+
+  useEffect(() => {
+    // Initialize AI client safely
+    try {
+      const apiKey = process.env.API_KEY;
+      if (!apiKey) {
+        throw new Error("מפתח ה-API של Gemini אינו מוגדר בסביבת המשתנים.");
+      }
+      const genAI = new GoogleGenAI({ apiKey });
+      setAi(genAI);
+    } catch (error) {
+      console.error("Error initializing GoogleGenAI:", error);
+      setErrorMessage(error instanceof Error ? error.message : "אירעה שגיאה באתחול שירות ה-AI.");
+      setAppState('ERROR');
+    }
+  }, []);
 
   const activeProfile = useMemo(() => {
     return allProfiles.find(p => p.id === activeProfileId) || null;
   }, [allProfiles, activeProfileId]);
 
   useEffect(() => {
+    if (appState === 'ERROR' || !ai) {
+      return; // Don't change state if there's an error or AI is not ready
+    }
+
     if (activeProfile) {
       setAppState('DASHBOARD');
     } else if (appState !== 'ONBOARDING') { // Don't interrupt onboarding
       setAppState('SELECT_PROFILE');
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeProfile]);
+  }, [ai, activeProfile]);
 
 
   const handleSelectProfile = (id: string) => {
@@ -38,6 +57,7 @@ const App: React.FC = () => {
 
   const handleLogout = () => {
     setActiveProfileId(null);
+    setAppState('SELECT_PROFILE');
   };
 
   const handleNewProfile = () => {
@@ -107,12 +127,21 @@ const App: React.FC = () => {
 
   const renderContent = () => {
     switch (appState) {
+      case 'ERROR':
+        return (
+            <div className="text-center p-10">
+                <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg" role="alert">
+                    <strong className="font-bold">שגיאת תצורה!</strong>
+                    <span className="block sm:inline ml-2">{errorMessage}</span>
+                </div>
+            </div>
+        );
       case 'SELECT_PROFILE':
         return <UserSelection profiles={allProfiles} onSelectProfile={handleSelectProfile} onDeleteProfile={handleDeleteProfile} onNewProfile={handleNewProfile} />;
       case 'ONBOARDING':
         return <Onboarding onComplete={handleOnboardingComplete} />;
       case 'DASHBOARD':
-        if (activeProfile) {
+        if (activeProfile && ai) {
           return <Dashboard 
             userProfile={activeProfile} 
             onUpdateProfile={handleProfileUpdate} 
