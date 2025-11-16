@@ -1,5 +1,4 @@
 
-
 import React from 'react';
 
 interface BmiChartProps {
@@ -7,66 +6,100 @@ interface BmiChartProps {
 }
 
 const BmiChart: React.FC<BmiChartProps> = ({ bmi }) => {
-  const minBmi = 15;
-  const maxBmi = 40;
-  const range = maxBmi - minBmi;
-
-  const getPositionPercentage = (value: number) => {
-    const percentage = ((value - minBmi) / range) * 100;
-    return Math.max(0, Math.min(100, percentage));
-  };
-
-  const userBmiPosition = getPositionPercentage(bmi);
+  // Constants for the gauge
+  const MIN_BMI = 15;
+  const MAX_BMI = 40;
+  const GAUGE_RADIUS = 90;
+  const CENTER_X = 125;
+  const CENTER_Y = 105;
+  const ARC_WIDTH = 35;
+  const LABEL_OFFSET = 18; // How far inside the arc to put the label
 
   const categories = [
-    { name: 'תת משקל', color: 'bg-blue-400', end: 18.5 },
-    { name: 'משקל תקין', color: 'bg-green-500', end: 25 },
-    { name: 'עודף משקל', color: 'bg-amber-500', end: 30 },
-    { name: 'השמנת יתר', color: 'bg-red-500', end: maxBmi },
+    { name: 'תת משקל', max: 18.5, color: '#93c5fd' /* blue-300 */ },
+    { name: 'תקין', max: 25, color: '#7dd3fc' /* sky-300 */ },
+    { name: 'משקל עודף', max: 30, color: '#fcd34d' /* amber-300 */ },
+    { name: 'השמנה', max: 35, color: '#f9a8d4' /* pink-300 */ },
+    { name: 'השמנה קיצונית', max: MAX_BMI, color: '#f472b6' /* pink-400 */ }
   ];
 
-  let lastEnd = minBmi;
+  const polarToCartesian = (centerX: number, centerY: number, radius: number, angleInDegrees: number) => {
+    const angleInRadians = ((angleInDegrees - 90) * Math.PI) / 180.0;
+    return {
+      x: centerX + radius * Math.cos(angleInRadians),
+      y: centerY + radius * Math.sin(angleInRadians),
+    };
+  };
 
+  const describeArc = (x: number, y: number, radius: number, startAngle: number, endAngle: number) => {
+    const start = polarToCartesian(x, y, radius, startAngle);
+    const end = polarToCartesian(x, y, radius, endAngle);
+    const largeArcFlag = endAngle - startAngle <= 180 ? '0' : '1';
+    return `M ${start.x} ${start.y} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${end.x} ${end.y}`;
+  };
+
+  const bmiToAngle = (bmiValue: number) => {
+    const clampedBmi = Math.max(MIN_BMI, Math.min(MAX_BMI, bmiValue));
+    return ((clampedBmi - MIN_BMI) / (MAX_BMI - MIN_BMI)) * 180;
+  };
+  
+  const needleAngle = bmiToAngle(bmi);
+  const currentCategory = categories.find(cat => bmi < cat.max) || categories[categories.length - 1];
+  
+  let lastMax = MIN_BMI;
+  
   return (
-    <div className="p-6">
-      <h3 className="text-xl font-bold text-slate-800 mb-4">מדד מסת הגוף (BMI)</h3>
-      <div className="relative w-full mt-8">
-        {/* User's BMI Indicator */}
-        <div
-          className="absolute z-10 text-center transition-all duration-500 ease-out"
-          style={{ left: `${userBmiPosition}%`, transform: 'translateX(-50%)', top: '-35px' }}
-        >
-          <span className="text-sm font-bold text-primary-600 bg-white px-2 py-1 rounded-md shadow-lg whitespace-nowrap">ה-BMI שלך: {bmi.toFixed(1)}</span>
-          <div className="w-0 h-0 border-l-8 border-l-transparent border-r-8 border-r-transparent border-t-8 border-t-primary-600 mx-auto mt-1"></div>
-        </div>
-
-        {/* BMI Scale Bar and Labels */}
-        <div>
-            <div className="flex h-5 rounded-full overflow-hidden shadow-inner bg-slate-100">
+    <div className="p-6 bg-gradient-to-br from-sky-100 to-blue-100 rounded-xl shadow-lg">
+      <h3 className="text-4xl font-bold text-center text-pink-500 mb-2 tracking-wider">BMI</h3>
+      
+      <div className="relative w-full max-w-sm mx-auto" style={{paddingTop: '50%'}}> {/* Aspect ratio hack */}
+        <div className="absolute inset-0">
+          <svg viewBox="0 0 250 125" className="w-full h-full">
             {categories.map((cat) => {
-                const width = ((cat.end - lastEnd) / range) * 100;
-                lastEnd = cat.end;
-                return (
-                <div key={cat.name} className={`${cat.color}`} style={{ width: `${width}%` }}></div>
-                );
+              const startAngle = bmiToAngle(lastMax);
+              const endAngle = bmiToAngle(cat.max);
+              const arcPath = describeArc(CENTER_X, CENTER_Y, GAUGE_RADIUS, startAngle, endAngle);
+              const midAngle = startAngle + (endAngle - startAngle) / 2;
+              const labelPos = polarToCartesian(CENTER_X, CENTER_Y, GAUGE_RADIUS - LABEL_OFFSET, midAngle);
+              lastMax = cat.max;
+              
+              return (
+                <g key={cat.name}>
+                  <path d={arcPath} stroke={cat.color} strokeWidth={ARC_WIDTH} fill="none" />
+                  <text
+                    x={labelPos.x}
+                    y={labelPos.y}
+                    textAnchor="middle"
+                    alignmentBaseline="middle"
+                    className="text-[10px] sm:text-xs font-bold fill-gray-800 pointer-events-none"
+                  >
+                    {cat.name}
+                  </text>
+                </g>
+              );
             })}
+          </svg>
+          
+          {/* Needle */}
+          <div className="absolute w-full h-full top-0 left-0 flex justify-center" style={{ transform: `translateY(-${(125 - CENTER_Y) / 125 * 100}%)` }}>
+            <div
+              className="absolute bottom-0 w-1 origin-bottom transition-transform duration-700 ease-in-out"
+              style={{
+                height: `${(GAUGE_RADIUS - 10) / 125 * 100}%`,
+                transform: `rotate(${needleAngle - 90}deg)`
+              }}
+            >
+              <div className="w-full h-full bg-slate-800 rounded-t-full shadow-lg"></div>
             </div>
+            {/* Pivot */}
+            <div className="absolute bottom-0 w-6 h-6 bg-white rounded-full border-4 border-slate-800" style={{ transform: 'translateY(50%)' }}></div>
+          </div>
+        </div>
+      </div>
 
-            <div className="relative h-4 mt-1">
-            <span style={{ transform: 'translateX(-50%)', left: `${getPositionPercentage(18.5)}%`}} className="absolute text-xs text-slate-500">18.5</span>
-            <span style={{ transform: 'translateX(-50%)', left: `${getPositionPercentage(25)}%`}} className="absolute text-xs text-slate-500">25</span>
-            <span style={{ transform: 'translateX(-50%)', left: `${getPositionPercentage(30)}%`}} className="absolute text-xs text-slate-500">30</span>
-            </div>
-        </div>
-        
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-2 mt-4 text-center text-sm">
-            {categories.map(cat => (
-                <div key={cat.name} className="flex items-center justify-center gap-2">
-                   <span className={`w-3 h-3 rounded-full ${cat.color}`}></span>
-                   <span className="text-slate-600 font-medium">{cat.name}</span>
-                </div>
-            ))}
-        </div>
+      <div className="text-center mt-2">
+        <p className="text-slate-600 text-lg">ה-BMI שלך הוא <span className="font-bold text-2xl text-slate-800">{bmi.toFixed(1)}</span></p>
+        <p className="font-semibold text-xl text-slate-700">{currentCategory.name}</p>
       </div>
     </div>
   );
